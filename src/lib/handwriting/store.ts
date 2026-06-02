@@ -85,22 +85,25 @@ const getPageDimensions = (sizeId: string) => {
 const getLineLimit = (sizeId: string, margins: { top: number, bottom: number }): number => {
   const { h } = getPageDimensions(sizeId);
   const effectiveHeight = h - margins.top - margins.bottom;
-  let buffer = 5;
   const lineHeightMm = 12.8;
-  if (sizeId === 'a5') buffer = 2;
+  const buffer = sizeId === 'a5' ? 1 : 2;
   return Math.max(1, Math.floor((effectiveHeight - buffer) / lineHeightMm));
 };
 
 const getCharsPerLine = (sizeId: string, margins: { left: number, right: number }): number => {
   const { w } = getPageDimensions(sizeId);
   const effectiveWidth = w - margins.left - margins.right;
-  let charWidthMm = 4.4;
-  let widthBuffer = 10;
-  if (sizeId === 'a5') {
-    charWidthMm = 4.2;
-    widthBuffer = 4;
-  }
+  const charWidthMm = sizeId === 'a5' ? 4.2 : 4.4;
+  const widthBuffer = sizeId === 'a5' ? 2 : 4;
   return Math.max(10, Math.floor((effectiveWidth - widthBuffer) / charWidthMm));
+};
+
+const findWordBreakIndex = (content: string, maxCharIndex: number): number => {
+  if (maxCharIndex >= content.length) return content.length;
+  const beforeSpace = content.lastIndexOf(' ', maxCharIndex);
+  const beforeNewline = content.lastIndexOf('\n', maxCharIndex);
+  const breakAt = Math.max(beforeSpace, beforeNewline);
+  return breakAt > 0 ? breakAt : maxCharIndex;
 };
 
 const createDefaultSection = (styleId: string, colorId: string): TextSection => ({
@@ -275,8 +278,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                 pullIndex += line.length + (i < nextLines.length - 1 ? 1 : 0);
               }
               if (linesToPull > 0) {
-                const contentToPull = firstNextSection.content.substring(0, pullIndex).trimEnd();
-                const contentRemaining = firstNextSection.content.substring(pullIndex).trimStart();
+                const pullBreak = findWordBreakIndex(firstNextSection.content, pullIndex);
+                const contentToPull = firstNextSection.content.substring(0, pullBreak).trimEnd();
+                const contentRemaining = firstNextSection.content.substring(pullBreak).trimStart();
                 pages[pIdx].sections[currentSections.length - 1].content += (lastSection.content ? '\n' : '') + contentToPull;
                 pages[pIdx+1].sections[0].content = contentRemaining;
               }
@@ -309,8 +313,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             currentTotalProcessed += line.length + (i < rawLines.length - 1 ? 1 : 0);
           }
           if (splitIndex !== -1) {
-            const mainContent = section.content.substring(0, splitIndex).trimEnd();
-            const overflow = section.content.substring(splitIndex).trimStart();
+            const wordBreak = findWordBreakIndex(section.content, splitIndex);
+            const mainContent = section.content.substring(0, wordBreak).trimEnd();
+            const overflow = section.content.substring(wordBreak).trimStart();
             pages[pIdx].sections[sIdx].content = mainContent;
             if (pIdx < pages.length - 1) {
               pages[pIdx+1].sections[0].content = overflow + (pages[pIdx+1].sections[0].content ? '\n' + pages[pIdx+1].sections[0].content : '');
@@ -428,8 +433,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             runningContent += line + (i < rawLines.length - 1 ? '\n' : '');
           }
           if (splitCharIndex === -1) break;
-          const mainContent = section.content.substring(0, splitCharIndex).trimEnd();
-          const overflow = section.content.substring(splitCharIndex).trimStart();
+          const wordBreakIndex = findWordBreakIndex(section.content, splitCharIndex);
+          const mainContent = section.content.substring(0, wordBreakIndex).trimEnd();
+          const overflow = section.content.substring(wordBreakIndex).trimStart();
           pages[currentPage].sections[currentSection].content = mainContent;
           didSplit = true;
           if (currentPage < pages.length - 1) {
@@ -484,30 +490,51 @@ export const useAppStore = create<AppState>((set, get) => ({
   setText: (text) => {
     get().saveHistory();
     set((state) => {
-      const rawLines = text.split('\n');
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
       const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
       const pages: PageConfig[] = [];
-      let currentLines: string[] = [];
-      let currentVisualRows = 0;
+      let currentContent = '';
+      let currentRows = 0;
+
+      const rowsFor = (content: string) => {
+        const lines = content.split('\n');
+        return lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+      };
+
+      const flush = (content: string) => {
+        const page = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
+        page.sections[0].content = content;
+        pages.push(page);
+      };
+
+      const rawLines = text.split('\n');
       for (const line of rawLines) {
-        const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-        if (currentVisualRows + lineVisualRows > limit && currentLines.length > 0) {
-          const page = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-          page.sections[0].content = currentLines.join('\n');
-          pages.push(page);
-          currentLines = [line];
-          currentVisualRows = lineVisualRows;
+        const lineRows = Math.max(1, Math.ceil(line.length / charsPerLine));
+        if (currentRows + lineRows <= limit) {
+          currentContent += (currentContent ? '\n' : '') + line;
+          currentRows += lineRows;
+          continue;
+        }
+        if (currentContent) flush(currentContent);
+        if (lineRows > limit) {
+          let remaining = line;
+          while (remaining.length > 0) {
+            const avail = limit * charsPerLine;
+            const splitAt = findWordBreakIndex(remaining, avail);
+            const part = remaining.substring(0, splitAt).trimEnd();
+            const next = remaining.substring(part.length > 0 ? splitAt : avail).trimStart();
+            flush(part || remaining.substring(0, avail));
+            remaining = next;
+            if (!remaining) break;
+          }
+          currentContent = '';
+          currentRows = 0;
         } else {
-          currentLines.push(line);
-          currentVisualRows += lineVisualRows;
+          currentContent = line;
+          currentRows = lineRows;
         }
       }
-      if (currentLines.length > 0 || pages.length === 0) {
-        const page = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-        page.sections[0].content = currentLines.join('\n');
-        pages.push(page);
-      }
+      if (currentContent || pages.length === 0) flush(currentContent || '');
       return { pages, currentPageIndex: 0 };
     });
   },
@@ -516,30 +543,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveHistory();
     set((state) => {
       const allText = state.pages.flatMap(p => p.sections.map(s => s.content)).join('\n');
-      const rawLines = allText.split('\n');
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
       const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
       const newPages: PageConfig[] = [];
-      let currentLines: string[] = [];
-      let currentVisualRows = 0;
+      let currentContent = '';
+      let currentRows = 0;
+
+      const rowsFor = (content: string) => {
+        const lines = content.split('\n');
+        return lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+      };
+
+      const flush = (content: string) => {
+        const page = createDefaultPage(newPages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
+        page.sections[0].content = content;
+        newPages.push(page);
+      };
+
+      const rawLines = allText.split('\n');
       for (const line of rawLines) {
-        const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-        if (currentVisualRows + lineVisualRows > limit && currentLines.length > 0) {
-          const page = createDefaultPage(newPages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-          page.sections[0].content = currentLines.join('\n');
-          newPages.push(page);
-          currentLines = [line];
-          currentVisualRows = lineVisualRows;
+        const lineRows = Math.max(1, Math.ceil(line.length / charsPerLine));
+        if (currentRows + lineRows <= limit) {
+          currentContent += (currentContent ? '\n' : '') + line;
+          currentRows += lineRows;
+          continue;
+        }
+        if (currentContent) flush(currentContent);
+        if (lineRows > limit) {
+          let remaining = line;
+          while (remaining.length > 0) {
+            const avail = limit * charsPerLine;
+            const splitAt = findWordBreakIndex(remaining, avail);
+            const part = remaining.substring(0, splitAt).trimEnd();
+            const next = remaining.substring(part.length > 0 ? splitAt : avail).trimStart();
+            flush(part || remaining.substring(0, avail));
+            remaining = next;
+            if (!remaining) break;
+          }
+          currentContent = '';
+          currentRows = 0;
         } else {
-          currentLines.push(line);
-          currentVisualRows += lineVisualRows;
+          currentContent = line;
+          currentRows = lineRows;
         }
       }
-      if (currentLines.length > 0 || newPages.length === 0) {
-        const page = createDefaultPage(newPages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-        page.sections[0].content = currentLines.join('\n');
-        newPages.push(page);
-      }
+      if (currentContent || newPages.length === 0) flush(currentContent || '');
       return { pages: newPages, currentPageIndex: 0 };
     });
   },
