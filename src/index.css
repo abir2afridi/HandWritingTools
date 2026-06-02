@@ -283,6 +283,139 @@
   background-position: 0 8px;
 }
 
+/* Realistic White Paper style */
+.paper-realistic-white {
+  background-color: #fafaf7;
+  background-image:
+    /* Diagonal subtle paper texture lines (linen style) */
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.003) 0px, rgba(0, 0, 0, 0.003) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.003) 0px, rgba(0, 0, 0, 0.003) 1px, transparent 1px, transparent 4px),
+    /* Fine noise pattern */
+    radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 0),
+    /* Vignette shading for depth */
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4) 0%, rgba(0, 0, 0, 0.02) 100%);
+  background-size: 100% 100%, 100% 100%, 3px 3px, 100% 100%;
+  box-shadow: inset 0 0 24px rgba(0,0,0,0.015);
+}
+
+.dark .paper-realistic-white {
+  background-color: #1a1a1b;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.002) 0px, rgba(255, 255, 255, 0.002) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.002) 0px, rgba(255, 255, 255, 0.002) 1px, transparent 1px, transparent 4px),
+    radial-gradient(rgba(255, 255, 255, 0.008) 1px, transparent 0),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background-size: 100% 100%, 100% 100%, 3px 3px, 100% 100%;
+  box-shadow: inset 0 0 24px rgba(0,0,0,0.2);
+}
+
+/* Cornell Notes style */
+.paper-cornell {
+  background-image:
+    /* Red vertical line */
+    linear-gradient(90deg, transparent 28%, hsl(0 60% 70%) 28%, hsl(0 60% 70%) 28.5%, transparent 28.5%),
+    /* Blue horizontal bottom line at 80% height */
+    linear-gradient(transparent 80%, hsl(var(--paper-lined)) 80%, hsl(var(--paper-lined)) 80.5%, transparent 80.5%),
+    /* Ruled lines */
+    repeating-linear-gradient(
+      transparent,
+      transparent 31px,
+      hsl(var(--paper-lined)) 31px,
+      hsl(var(--paper-lined)) 32px
+    );
+  background-position: 0 0, 0 0, 0 8px;
+  background-size: 100% 100%, 100% 100%, 100% 32px;
+  background-repeat: no-repeat, no-repeat, repeat;
+}
+
+.dark .paper-cornell {
+  background-image:
+    /* Red vertical line */
+    linear-gradient(90deg, transparent 28%, hsl(0 60% 50%) 28%, hsl(0 60% 50%) 28.5%, transparent 28.5%),
+    /* Blue horizontal bottom line at 80% height */
+    linear-gradient(transparent 80%, hsl(var(--paper-lined)) 80%, hsl(var(--paper-lined)) 80.5%, transparent 80.5%),
+    /* Ruled lines */
+    repeating-linear-gradient(
+      transparent,
+      transparent 31px,
+      hsl(var(--paper-lined)) 31px,
+      hsl(var(--paper-lined)) 32px
+    );
+}
+
+/* Hex Grid layout */
+.paper-hex-grid {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='41.568' viewBox='0 0 24 41.568'%3E%3Cpath d='M12 0 L24 6.928 L24 20.784 L12 27.712 L0 20.784 L0 6.928 Z M0 41.568 L12 34.64 L24 41.568' fill='none' stroke='%23cbd5e1' stroke-width='0.75'/%3E%3C/svg%3E");
+  background-size: 24px 41.568px;
+}
+
+.dark .paper-hex-grid {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='41.568' viewBox='0 0 24 41.568'%3E%3Cpath d='M12 0 L24 6.928 L24 20.784 L12 27.712 L0 20.784 L0 6.928 Z M0 41.568 L12 34.64 L24 41.568' fill='none' stroke='%23475569' stroke-width='0.75'/%3E%3C/svg%3E");
+}
+
+/* Music Staff style */
+.paper-music {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='64' viewBox='0 0 100 64'%3E%3Cpath d='M0 10h100M0 16h100M0 22h100M0 28h100M0 34h100' fill='none' stroke='%23cbd5e1' stroke-width='0.75'/%3E%3C/svg%3E");
+  background-size: 100% 64px;
+  background-repeat: repeat-y;
+}
+
+.dark .paper-music {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='64' viewBox='0 0 100 64'%3E%3Cpath d='M0 10h100M0 16h100M0 22h100M0 28h100M0 34h100' fill='none' stroke='%23475569' stroke-width='0.75'/%3E%3C/svg%3E");
+}
+
+/* Vintage Parchment style */
+.paper-parchment {
+  background-color: #f3edd7;
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(139, 90, 43, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 80% 70%, rgba(139, 90, 43, 0.1) 0%, transparent 50%),
+    repeating-linear-gradient(
+      transparent,
+      transparent 31px,
+      rgba(139, 90, 43, 0.08) 31px,
+      rgba(139, 90, 43, 0.08) 32px
+    );
+  background-position: 0 0, 0 0, 0 8px;
+}
+
+.dark .paper-parchment {
+  background-color: #1e1b14;
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(139, 90, 43, 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 80% 70%, rgba(139, 90, 43, 0.12) 0%, transparent 50%),
+    repeating-linear-gradient(
+      transparent,
+      transparent 31px,
+      rgba(255, 255, 255, 0.05) 31px,
+      rgba(255, 255, 255, 0.05) 32px
+    );
+}
+
+/* Graphite Grid style */
+.paper-dark-grid {
+  background-color: #181a1f;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Blackboard style */
+.paper-blackboard {
+  background-color: #143224;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    repeating-linear-gradient(
+      transparent,
+      transparent 31px,
+      rgba(255, 255, 255, 0.04) 31px,
+      rgba(255, 255, 255, 0.04) 32px
+    );
+  background-position: 0 0, 0 8px;
+  background-size: 100% 100%, 100% 32px;
+}
+
 .paper-margin {
   border-left: 2px solid hsl(0 60% 70%);
   padding-left: 2.5rem;

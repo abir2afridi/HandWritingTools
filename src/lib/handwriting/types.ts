@@ -110,24 +110,26 @@ export const INK_COLORS: InkColor[] = [
   { id: 'red', name: 'Red Ink', value: '#922b21', cssClass: 'text-ink-red' },
   { id: 'green', name: 'Green Ink', value: '#1e6e3e', cssClass: '' },
   { id: 'purple', name: 'Purple Ink', value: '#6c3483', cssClass: '' },
-  { id: 'navy', name: 'Navy Blue', value: '#0a2463', cssClass: '' },
-  { id: 'brown', name: 'Brown Ink', value: '#6b4226', cssClass: '' },
-  { id: 'teal', name: 'Teal Ink', value: '#1a7a6d', cssClass: '' },
   { id: 'orange', name: 'Orange Ink', value: '#c75000', cssClass: '' },
-  { id: 'pink', name: 'Pink Ink', value: '#b5338a', cssClass: '' },
-  { id: 'gray', name: 'Pencil Gray', value: '#5a5a5a', cssClass: '' },
-  { id: 'lightblue', name: 'Light Blue', value: '#2980b9', cssClass: '' },
 ];
 
 export const PAGE_LAYOUTS: PageLayout[] = [
   { id: 'plain', name: 'Plain White', paperClass: 'bg-paper-white', description: 'Clean white paper' },
+  { id: 'realistic-white', name: 'Realistic White', paperClass: 'paper-realistic-white', description: 'Premium tactile cotton paper' },
   { id: 'ruled', name: 'Ruled Lines', paperClass: 'paper-ruled bg-paper-white', description: 'Horizontal lines like a notebook' },
   { id: 'college', name: 'College Ruled', paperClass: 'paper-college bg-paper-white', description: 'Narrow-spaced ruled lines' },
+  { id: 'cream-ruled', name: 'Cream Lined', paperClass: 'paper-ruled bg-paper-cream', description: 'Warm cream lined paper' },
+  { id: 'cornell', name: 'Cornell Notes', paperClass: 'paper-cornell bg-paper-white', description: 'Cornell system notebook' },
   { id: 'dotted', name: 'Dotted Grid', paperClass: 'paper-dotted bg-paper-white', description: 'Dot grid pattern' },
   { id: 'grid', name: 'Square Grid', paperClass: 'paper-grid bg-paper-white', description: 'Square grid lines' },
+  { id: 'hex-grid', name: 'Hex Grid', paperClass: 'paper-hex-grid bg-paper-white', description: 'Hexagonal chemistry grid' },
+  { id: 'music', name: 'Music Sheet', paperClass: 'paper-music bg-paper-white', description: 'Staff paper for musical notation' },
   { id: 'aged', name: 'Aged Paper', paperClass: 'paper-aged', description: 'Vintage yellowed paper' },
+  { id: 'parchment', name: 'Vintage Parchment', paperClass: 'paper-parchment', description: 'Antique textured parchment' },
   { id: 'blueprint', name: 'Blueprint', paperClass: 'paper-blueprint', description: 'Engineering blueprint style' },
   { id: 'legal-pad', name: 'Legal Pad', paperClass: 'paper-legal', description: 'Yellow legal pad' },
+  { id: 'dark-grid', name: 'Graphite Grid', paperClass: 'paper-dark-grid', description: 'Premium dark slate grid' },
+  { id: 'blackboard', name: 'Blackboard', paperClass: 'paper-blackboard', description: 'Classroom green blackboard' },
 ];
 
 export const PAGE_SIZES: PageSize[] = [

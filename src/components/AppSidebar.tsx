@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Presentation, FileText, Layout, BarChart3, Globe, FolderOpen, Settings, Home, PenTool, Palette, Eye, Download, LayoutTemplate, PenTool as WriterIcon } from 'lucide-react';
+import { Sparkles, Presentation, FileText, Layout, BarChart3, Globe, FolderOpen, Settings, Home, PenTool, Palette, Eye, Download, LayoutTemplate, PenTool as WriterIcon, ChevronLeft, PanelLeft } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -26,13 +26,13 @@ export default function AppSidebar({ className }: { className?: string }) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const toggleSidebar = () => setIsExpanded((prev) => !prev);
+
   return (
     <motion.aside
       initial={false}
       animate={{ width: isExpanded ? 220 : 68 }}
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
-      className={cn("h-screen border-r border-border bg-surface flex flex-col shrink-0 overflow-hidden relative z-50 shadow-sm", className)}
+      className={cn("h-screen border-r border-border bg-surface flex flex-col shrink-0 overflow-hidden relative z-50 shadow-sm group/sidebar", className)}
     >
       {/* Logo */}
       <div className="p-4 border-b border-border flex items-center shrink-0 h-[73px]">
@@ -49,7 +49,7 @@ export default function AppSidebar({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none pb-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
         {/* Model Engine Status */}
         <AnimatePresence>
           {isExpanded && (
@@ -214,6 +214,22 @@ export default function AppSidebar({ className }: { className?: string }) {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Bottom toggle button */}
+      <div className="shrink-0 border-t border-border p-3 flex justify-center">
+        <button
+          onClick={toggleSidebar}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-muted transition-colors"
+        >
+          <ChevronLeft className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", !isExpanded && "rotate-180")} />
+          <motion.span
+            animate={{ opacity: isExpanded ? 1 : 0, width: isExpanded ? 'auto' : 0 }}
+            className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap overflow-hidden"
+          >
+            Collapse
+          </motion.span>
+        </button>
       </div>
     </motion.aside>
   );

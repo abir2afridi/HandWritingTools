@@ -11,7 +11,7 @@ import {
   Plus, Trash2, ClipboardPaste, Download, Image as ImageIcon, 
   Loader2, Type, Maximize, FileDown, Layers, ChevronRight, 
   Menu, ZoomIn, ZoomOut, Search, ArrowLeft, MoreVertical, 
-  Settings, Sparkles, ArrowRight, Save, Layout, Info,
+  Palette, Settings, Sparkles, ArrowRight, Save, Layout, Info, Scissors, RotateCcw,
   Cloud, Check, FileText, PenTool, ChevronDown, X, PanelLeftClose, PanelRightClose,
   Undo2, Redo2
 } from 'lucide-react';
@@ -34,7 +34,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { PAGE_SIZES } from '@/lib/handwriting/types';
+import { PAGE_SIZES, INK_COLORS } from '@/lib/handwriting/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -654,9 +654,26 @@ const EditorPage = () => {
                       exit={{ opacity: 0, scale: 0.98, y: 10 }}
                       className="bg-muted/10 rounded-xl p-4 border border-border/40 mb-6 overflow-hidden relative"
                     >
-                      <h3 className="text-[9px] font-bold uppercase mb-2 flex items-center gap-2 text-primary tracking-widest">
-                        <ClipboardPaste className="h-3 w-3" /> Text Importer
-                      </h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-[9px] font-bold uppercase flex items-center gap-2 text-primary tracking-widest">
+                          <ClipboardPaste className="h-3 w-3" /> Text Importer
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText();
+                              setBulkText(text);
+                            } catch {
+                              toast.error('Unable to read clipboard. Please paste manually.');
+                            }
+                          }}
+                          className="h-6 px-2 text-[8px] font-black uppercase tracking-wider text-primary/60 hover:text-primary"
+                        >
+                          <ClipboardPaste className="h-2.5 w-2.5 mr-1" /> Paste
+                        </Button>
+                      </div>
                       <Textarea
                         value={bulkText}
                         onChange={(e) => setBulkText(e.target.value)}
@@ -894,61 +911,143 @@ const EditorPage = () => {
                 </Button>
               )}
 
-              <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
-                <div className="p-6 pb-4">
-                   <div className="flex flex-col">
-                     <h2 className="text-xl font-bold tracking-tight text-foreground leading-none">Editor Settings</h2>
-                     <p className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-widest mt-1.5">Configure appearance</p>
-                   </div>
-                </div>
-              </div>
+                <Tabs defaultValue="handwriting" className="flex-1 flex flex-col overflow-hidden">
+                 <div className="px-6 pt-4 shrink-0">
+                   <TabsList className="w-full grid grid-cols-2">
+                     <TabsTrigger value="handwriting" className="text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                       <PenTool className="h-3.5 w-3.5 mr-1.5" /> Handwriting Style
+                     </TabsTrigger>
+                     <TabsTrigger value="paper" className="text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                       <Layout className="h-3.5 w-3.5 mr-1.5" /> Paper Style
+                     </TabsTrigger>
+                   </TabsList>
+                 </div>
+                  <div className="flex-1 overflow-hidden bg-[#fafafa]">
+                    <TabsContent value="handwriting" className="mt-0 h-full">
+                      <HandwritingStyleTab
+                       globalStyleId={globalStyleId}
+                       globalColorId={globalColorId}
+                       onStyleChange={(id) => setGlobalStyle(id, applyStyleToAll)}
+                       onColorChange={(id) => setGlobalColor(id, applyStyleToAll)}
+                       applyStyleToAll={applyStyleToAll}
+                       onApplyStyleToAllChange={setApplyStyleToAll}
+                     />
+                   </TabsContent>
+                    <TabsContent value="paper" className="mt-0 h-full">
+                      <div className="h-full overflow-y-auto">
+                        <PaperStyleTab
+                       selectedLayoutId={globalLayoutId}
+                       selectedSizeId={globalSizeId}
+                       showMargin={showMargin}
+                       showPageNumbers={showPageNumbers}
+                       inkSmudge={inkSmudge}
+                       applyLayoutToAll={applyLayoutToAll}
+                       onLayoutChange={(id) => setGlobalLayout(id, applyLayoutToAll)}
+                       onSizeChange={(id) => setGlobalSize(id, applyLayoutToAll)}
+                       onMarginChange={(v) => setShowMargin(v, applyLayoutToAll)}
+                       onPageNumbersChange={(v) => setShowPageNumbers(v, applyLayoutToAll)}
+                       onInkSmudgeChange={(v) => setInkSmudge(v)}
+                       onApplyLayoutToAllChange={setApplyLayoutToAll}
+                     />
+                      </div>
+                    </TabsContent>
+                  </div>
+                </Tabs>
 
-              <Tabs defaultValue="handwriting" className="flex-1 flex flex-col overflow-hidden">
-                <div className="px-6 pt-4 shrink-0">
-                  <TabsList className="w-full grid grid-cols-2">
-                    <TabsTrigger value="handwriting" className="text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                      <PenTool className="h-3.5 w-3.5 mr-1.5" /> Handwriting Style
-                    </TabsTrigger>
-                    <TabsTrigger value="paper" className="text-[10px] font-bold uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                      <Layout className="h-3.5 w-3.5 mr-1.5" /> Paper Style
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                <div className="flex-1 overflow-y-auto scrollbar-none scroll-smooth bg-[#fafafa]">
-                  <TabsContent value="handwriting" className="mt-0">
-                    <HandwritingStyleTab
-                      globalStyleId={globalStyleId}
-                      globalColorId={globalColorId}
-                      onStyleChange={(id) => setGlobalStyle(id, applyStyleToAll)}
-                      onColorChange={(id) => setGlobalColor(id, applyStyleToAll)}
-                      applyStyleToAll={applyStyleToAll}
-                      onApplyStyleToAllChange={setApplyStyleToAll}
-                    />
-                  </TabsContent>
-                  <TabsContent value="paper" className="mt-0">
-                    <PaperStyleTab
-                      selectedLayoutId={globalLayoutId}
-                      selectedSizeId={globalSizeId}
-                      showMargin={showMargin}
-                      showPageNumbers={showPageNumbers}
-                      inkSmudge={inkSmudge}
-                      globalMargins={globalMargins}
-                      applyLayoutToAll={applyLayoutToAll}
-                      onLayoutChange={(id) => setGlobalLayout(id, applyLayoutToAll)}
-                      onSizeChange={(id) => setGlobalSize(id, applyLayoutToAll)}
-                      onMarginChange={(v) => setShowMargin(v, applyLayoutToAll)}
-                      onPageNumbersChange={(v) => setShowPageNumbers(v, applyLayoutToAll)}
-                      onInkSmudgeChange={(v) => setInkSmudge(v)}
-                      onGlobalMarginsChange={(m) => setGlobalMargins(m, applyLayoutToAll)}
-                      onResetMargins={() => setGlobalMargins({ top: 20, bottom: 20, left: 20, right: 20 }, applyLayoutToAll)}
-                      onApplyLayoutToAllChange={setApplyLayoutToAll}
-                      onStartMarginEdit={() => setIsEditingMargins(true)}
-                      onStopMarginEdit={() => setIsEditingMargins(false)}
-                    />
-                  </TabsContent>
-                </div>
-              </Tabs>
-           </div>
+               {/* INK COLOR — sticky section outside tabs */}
+               <div className="shrink-0 border-t border-border/40 bg-white px-6 py-4">
+                 <div className="flex items-center justify-between mb-3">
+                   <h4 className="text-[9px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                     <Palette className="h-3 w-3" /> Ink Color
+                   </h4>
+                   <span className="text-[9px] font-black tracking-widest uppercase text-muted-foreground/60">
+                     {INK_COLORS.find(c => c.id === globalColorId)?.name || 'Custom'}
+                   </span>
+                 </div>
+                 <div className="flex gap-2.5 flex-wrap">
+                   {INK_COLORS.map((color) => (
+                     <button
+                       key={color.id}
+                       onClick={() => setGlobalColor(color.id, applyStyleToAll)}
+                       className={cn(
+                         "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center relative",
+                         globalColorId === color.id
+                           ? "border-primary scale-110 shadow-md"
+                           : "border-transparent hover:scale-105"
+                       )}
+                       style={{ backgroundColor: color.value }}
+                     >
+                       {globalColorId === color.id && <Check className="h-3 w-3 text-white drop-shadow-md" />}
+                     </button>
+                   ))}
+                    <div className="relative group flex items-center gap-1.5">
+                     <input 
+                       type="color"
+                       value={INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276'}
+                       onChange={(e) => setGlobalColor(e.target.value, applyStyleToAll)}
+                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                     />
+                     <div className={cn(
+                       "w-8 h-8 rounded-full border-2 border-dashed flex items-center justify-center transition-all cursor-pointer",
+                       !INK_COLORS.some(c => c.id === globalColorId)
+                       ? "border-primary scale-110 bg-primary/5"
+                       : "border-muted-foreground/30 hover:border-primary/50 group-hover:scale-105"
+                     )}>
+                       <div 
+                         className="w-4 h-4 rounded-full shadow-inner" 
+                         style={{ backgroundColor: !INK_COLORS.some(c => c.id === globalColorId) ? globalColorId : '#e2e8f0' }} 
+                       />
+                     </div>
+                     <span className="text-[8px] font-bold text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors uppercase tracking-wider">Custom</span>
+                   </div>
+                 </div>
+               </div>
+
+               {/* PAPER ARCHITECTURE — sticky at bottom, outside tabs */}
+               <div
+                 className="shrink-0 border-t border-border/40 bg-white px-6 py-4"
+                 onMouseEnter={() => setIsEditingMargins(true)}
+                 onMouseLeave={() => setIsEditingMargins(false)}
+               >
+                 <div className="flex items-center justify-between mb-4">
+                   <h4 className="text-[9px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                     <Scissors className="h-3 w-3" /> Paper Architecture (mm)
+                   </h4>
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => setGlobalMargins({ top: 20, bottom: 20, left: 20, right: 20 }, applyLayoutToAll)}
+                     className="h-6 px-2 text-[8px] font-black uppercase tracking-tighter opacity-40 hover:opacity-100 hover:bg-primary/5"
+                   >
+                     <RotateCcw className="h-2.5 w-2.5 mr-1" /> Reset
+                   </Button>
+                 </div>
+                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                   {[
+                     { label: 'Top', key: 'top' as const },
+                     { label: 'Bottom', key: 'bottom' as const },
+                     { label: 'Left', key: 'left' as const },
+                     { label: 'Right', key: 'right' as const }
+                   ].map((m) => (
+                     <div key={m.key} className="space-y-2">
+                       <div className="flex justify-between items-center px-0.5">
+                         <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">{m.label}</span>
+                         <span className="text-[9px] font-black text-foreground tabular-nums">{globalMargins[m.key]}mm</span>
+                       </div>
+                       <Slider
+                         value={[globalMargins[m.key]]}
+                         onValueChange={(v) => setGlobalMargins({ [m.key]: v[0] }, applyLayoutToAll)}
+                         onPointerUp={() => useAppStore.getState().rebalancePages()}
+                         min={0}
+                         max={60}
+                         step={1}
+                         className="h-3"
+                       />
+                     </div>
+                   ))}
+                 </div>
+               </div>
+            </div>
            {/* Hidden Capture Area */}
           <div className="fixed -left-[8000px] top-0 pointer-events-none opacity-0">
               {pages.map((page, i) => (

@@ -85,22 +85,57 @@ const getPageDimensions = (sizeId: string) => {
 const getLineLimit = (sizeId: string, margins: { top: number, bottom: number }): number => {
   const { h } = getPageDimensions(sizeId);
   const effectiveHeight = h - margins.top - margins.bottom;
-  let buffer = 5;
+  let buffer = 1;
   const lineHeightMm = 12.8;
-  if (sizeId === 'a5') buffer = 2;
+  if (sizeId === 'a5') buffer = 1;
   return Math.max(1, Math.floor((effectiveHeight - buffer) / lineHeightMm));
 };
 
 const getCharsPerLine = (sizeId: string, margins: { left: number, right: number }): number => {
   const { w } = getPageDimensions(sizeId);
   const effectiveWidth = w - margins.left - margins.right;
-  let charWidthMm = 4.4;
-  let widthBuffer = 10;
+  // charWidthMm tuned to match Caveat/handwriting font at 18px (~7.5px/char = 3.0mm)
+  // Slightly conservative (3.2mm) to account for variable character widths and prevent CSS overflow-wrap
+  let charWidthMm = 3.2;
+  let widthBuffer = 4;
   if (sizeId === 'a5') {
-    charWidthMm = 4.2;
-    widthBuffer = 4;
+    charWidthMm = 3.1;
+    widthBuffer = 2;
   }
   return Math.max(10, Math.floor((effectiveWidth - widthBuffer) / charWidthMm));
+};
+
+const wrapTextByWords = (text: string, charsPerLine: number): string[] => {
+  const paragraphs = text.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.length === 0) {
+      wrappedLines.push('');
+      continue;
+    }
+
+    const words = paragraph.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      if (word.length === 0) continue;
+      
+      if (currentLine === '') {
+        currentLine = word;
+      } else if (currentLine.length + 1 + word.length <= charsPerLine) {
+        currentLine += ' ' + word;
+      } else {
+        wrappedLines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine !== '') {
+      wrappedLines.push(currentLine);
+    }
+  }
+
+  return wrappedLines;
 };
 
 const createDefaultSection = (styleId: string, colorId: string): TextSection => ({
@@ -239,92 +274,98 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGlobalSize: (id, applyToAll = true) => {
     get().saveHistory();
     set((state) => {
-      const limit = getLineLimit(id, state.globalMargins);
-      const charsPerLine = getCharsPerLine(id, state.globalMargins);
-      let pages = JSON.parse(JSON.stringify(state.pages));
-
-      for (let pIdx = 0; pIdx < pages.length; pIdx++) {
-        if (!applyToAll && pIdx !== state.currentPageIndex) continue;
-        pages[pIdx].sizeId = id;
-
-        if (pIdx < pages.length - 1) {
-          const currentSections = pages[pIdx].sections;
-          const lastSection = currentSections[currentSections.length - 1];
-          let currentTotalLines = 0;
-          currentSections.forEach((s: TextSection) => {
-            const lines = (s.content || "").split('\n');
-            lines.forEach((l: string) => {
-               currentTotalLines += Math.max(1, Math.ceil(l.length / charsPerLine));
-            });
-          });
-          if (currentTotalLines < limit && lastSection && !lastSection.isHeading) {
-            const spaceLeft = limit - currentTotalLines;
-            const nextSections = pages[pIdx+1].sections;
-            const firstNextSection = nextSections[0];
-            if (firstNextSection && !firstNextSection.isHeading && firstNextSection.content) {
-              const nextLines = firstNextSection.content.split('\n');
-              let linesToPull = 0;
-              let visualLinesPulled = 0;
-              let pullIndex = 0;
-              for (let i = 0; i < nextLines.length; i++) {
-                const line = nextLines[i];
-                const lineRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-                if (visualLinesPulled + lineRows > spaceLeft) break;
-                visualLinesPulled += lineRows;
-                linesToPull++;
-                pullIndex += line.length + (i < nextLines.length - 1 ? 1 : 0);
-              }
-              if (linesToPull > 0) {
-                const contentToPull = firstNextSection.content.substring(0, pullIndex).trimEnd();
-                const contentRemaining = firstNextSection.content.substring(pullIndex).trimStart();
-                pages[pIdx].sections[currentSections.length - 1].content += (lastSection.content ? '\n' : '') + contentToPull;
-                pages[pIdx+1].sections[0].content = contentRemaining;
-              }
-            }
-          }
+      const sizeId = applyToAll ? id : state.globalSizeId;
+      const pages = JSON.parse(JSON.stringify(state.pages));
+      
+      // Update sizes on pages
+      pages.forEach((p: PageConfig, idx: number) => {
+        if (applyToAll || idx === state.currentPageIndex) {
+          p.sizeId = sizeId;
         }
-        const currentPageSections = pages[pIdx].sections;
-        for (let sIdx = 0; sIdx < currentPageSections.length; sIdx++) {
-          const section = currentPageSections[sIdx];
-          if (section.isHeading || !section.content) continue;
-          const rawLines = section.content.split('\n');
-          let visualLineCount = 0;
-          let splitIndex = -1;
-          let currentTotalProcessed = 0;
-          let heightBefore = 0;
-          for (let prevIdx = 0; prevIdx < sIdx; prevIdx++) {
-             const prevS = currentPageSections[prevIdx];
-             (prevS.content || "").split('\n').forEach((l: string) => {
-                heightBefore += Math.max(1, Math.ceil(l.length / charsPerLine));
-             });
+      });
+      
+      // Now, flow text across pages starting from page 0
+      let currentPage = 0;
+      while (currentPage < pages.length) {
+        const page = pages[currentPage];
+        const limit = getLineLimit(page.sizeId, page.margins || state.globalMargins);
+        const charsPerLine = getCharsPerLine(page.sizeId, page.margins || state.globalMargins);
+        
+        let linesUsed = 0;
+        let sIdx = 0;
+        
+        while (sIdx < page.sections.length) {
+          const section = page.sections[sIdx];
+          if (section.isHeading || !section.content) {
+            sIdx++;
+            continue;
           }
-          for (let i = 0; i < rawLines.length; i++) {
-            const line = rawLines[i];
-            const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-            if (heightBefore + visualLineCount + lineVisualRows > limit) {
-              splitIndex = currentTotalProcessed;
-              break;
-            }
-            visualLineCount += lineVisualRows;
-            currentTotalProcessed += line.length + (i < rawLines.length - 1 ? 1 : 0);
-          }
-          if (splitIndex !== -1) {
-            const mainContent = section.content.substring(0, splitIndex).trimEnd();
-            const overflow = section.content.substring(splitIndex).trimStart();
-            pages[pIdx].sections[sIdx].content = mainContent;
-            if (pIdx < pages.length - 1) {
-              pages[pIdx+1].sections[0].content = overflow + (pages[pIdx+1].sections[0].content ? '\n' + pages[pIdx+1].sections[0].content : '');
+          
+          const wrappedLines = wrapTextByWords(section.content, charsPerLine);
+          const availableLines = Math.max(0, limit - linesUsed);
+          
+          if (wrappedLines.length > availableLines) {
+            // Split the section content
+            const mainContentLines = wrappedLines.slice(0, availableLines);
+            const overflowLines = wrappedLines.slice(availableLines);
+            
+            section.content = mainContentLines.join('\n');
+            const overflowText = overflowLines.join('\n');
+            
+            // Flow overflow to the next page
+            if (currentPage < pages.length - 1) {
+              const nextFirstSection = pages[currentPage + 1].sections[0];
+              nextFirstSection.content = overflowText + (nextFirstSection.content ? '\n' + nextFirstSection.content : '');
             } else {
-              const newPage = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, id, state.globalLayoutId, state.globalMargins);
-              newPage.sections[0].content = overflow;
+              const newPage = createDefaultPage(
+                pages.length + 1,
+                state.globalStyleId,
+                state.globalColorId,
+                page.sizeId,
+                state.globalLayoutId,
+                state.globalMargins
+              );
+              newPage.sections[0].content = overflowText;
               pages.push(newPage);
             }
           }
+          
+          // Re-wrap to see how many lines this section actually uses now
+          const activeLines = wrapTextByWords(section.content, charsPerLine).length;
+          linesUsed += activeLines;
+          sIdx++;
+        }
+        
+        currentPage++;
+      }
+      
+      // Clean up empty pages at the end (except the first page)
+      let lastIdx = pages.length - 1;
+      while (lastIdx > 0) {
+        const p = pages[lastIdx];
+        const hasContent = p.sections.some((s: TextSection) => 
+          (s.content && s.content.trim().length > 0) || 
+          (s.images && s.images.length > 0) || 
+          s.imageUrl
+        );
+        if (!hasContent) {
+          pages.pop();
+          lastIdx--;
+        } else {
+          break;
         }
       }
-      pages = pages.filter((p: PageConfig, i: number) => i === 0 || p.sections.some((s: TextSection) => (s.content && s.content.trim().length > 0) || (s.images && s.images.length > 0) || s.imageUrl));
-      pages = pages.map((p: PageConfig, i: number) => ({ ...p, pageNumber: i + 1 }));
-      return { globalSizeId: applyToAll ? id : state.globalSizeId, pages, currentPageIndex: Math.min(state.currentPageIndex, pages.length - 1) };
+      
+      // Update page numbers
+      pages.forEach((p: PageConfig, idx: number) => {
+        p.pageNumber = idx + 1;
+      });
+      
+      return { 
+        globalSizeId: applyToAll ? id : state.globalSizeId, 
+        pages, 
+        currentPageIndex: Math.min(state.currentPageIndex, pages.length - 1) 
+      };
     });
   },
 
@@ -405,45 +446,97 @@ export const useAppStore = create<AppState>((set, get) => ({
       const pages = JSON.parse(JSON.stringify(state.pages));
       if (!pages[pageIndex] || !pages[pageIndex].sections[sectionIndex]) return state;
       pages[pageIndex].sections[sectionIndex] = { ...pages[pageIndex].sections[sectionIndex], ...partial };
+
+      // --- FORWARD SPLIT: push overflow to next pages ---
       let currentPage = pageIndex;
       let currentSection = sectionIndex;
       let didSplit = false;
       while (true) {
-          const section = pages[currentPage].sections[currentSection];
-          if (section.isHeading || !section.content.length) break;
-          const limit = getLineLimit(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
-          const charsPerLine = getCharsPerLine(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
-          const rawLines = section.content.split('\n');
-          let visualLineCount = 0;
-          let splitCharIndex = -1;
-          let runningContent = "";
-          for (let i = 0; i < rawLines.length; i++) {
-            const line = rawLines[i];
-            const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-            if (visualLineCount + lineVisualRows > limit) {
-              splitCharIndex = runningContent.length;
-              break;
-            }
-            visualLineCount += lineVisualRows;
-            runningContent += line + (i < rawLines.length - 1 ? '\n' : '');
-          }
-          if (splitCharIndex === -1) break;
-          const mainContent = section.content.substring(0, splitCharIndex).trimEnd();
-          const overflow = section.content.substring(splitCharIndex).trimStart();
-          pages[currentPage].sections[currentSection].content = mainContent;
+        const section = pages[currentPage].sections[currentSection];
+        if (section.isHeading || !section.content.length) break;
+        const limit = getLineLimit(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
+        const charsPerLine = getCharsPerLine(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
+
+        const wrappedLines = wrapTextByWords(section.content, charsPerLine);
+        let linesBefore = 0;
+        for (let i = 0; i < currentSection; i++) {
+          const prevS = pages[currentPage].sections[i];
+          if (prevS.content) linesBefore += wrapTextByWords(prevS.content, charsPerLine).length;
+        }
+
+        const availableLines = Math.max(0, limit - linesBefore);
+        if (wrappedLines.length > availableLines) {
+          const mainContentLines = wrappedLines.slice(0, availableLines);
+          const overflowLines = wrappedLines.slice(availableLines);
+          pages[currentPage].sections[currentSection].content = mainContentLines.join('\n');
+          const overflowText = overflowLines.join('\n');
           didSplit = true;
           if (currentPage < pages.length - 1) {
-              pages[currentPage + 1].sections[0].content = overflow + (pages[currentPage + 1].sections[0].content ? '\n' + pages[currentPage + 1].sections[0].content : '');
-              currentPage++;
-              currentSection = 0;
+            const nextFirstSection = pages[currentPage + 1].sections[0];
+            pages[currentPage + 1].sections[0].content = overflowText + (nextFirstSection.content ? '\n' + nextFirstSection.content : '');
+            currentPage++;
+            currentSection = 0;
           } else {
-              const newPage = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-              newPage.sections[0].content = overflow;
-              pages.push(newPage);
-              currentPage++;
-              currentSection = 0;
+            const newPage = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
+            newPage.sections[0].content = overflowText;
+            pages.push(newPage);
+            currentPage++;
+            currentSection = 0;
           }
+        } else {
+          break;
+        }
       }
+
+      // --- BACKWARD PULL: fill space from subsequent pages ---
+      // When content is removed/reduced, pull forward from later pages to fill gaps
+      if ('content' in partial) {
+        for (let pullPage = pageIndex; pullPage < pages.length - 1; pullPage++) {
+          const pg = pages[pullPage];
+          const pg_limit = getLineLimit(pg.sizeId, pg.margins || state.globalMargins);
+          const pg_chars = getCharsPerLine(pg.sizeId, pg.margins || state.globalMargins);
+
+          // Count total lines currently on this page
+          let usedLines = 0;
+          for (const s of pg.sections) {
+            if (s.content) usedLines += wrapTextByWords(s.content, pg_chars).length;
+          }
+
+          const spaceLeft = pg_limit - usedLines;
+          if (spaceLeft <= 0) break; // This page is full, stop pulling
+
+          const nextPg = pages[pullPage + 1];
+          if (!nextPg) break;
+          const nextSection = nextPg.sections[0];
+          if (!nextSection || nextSection.isHeading || !nextSection.content) continue;
+
+          const nextWrapped = wrapTextByWords(nextSection.content, pg_chars);
+          if (nextWrapped.length === 0) continue;
+
+          const linesToPull = Math.min(spaceLeft, nextWrapped.length);
+          const pulled = nextWrapped.slice(0, linesToPull);
+          const remaining = nextWrapped.slice(linesToPull);
+
+          // Append pulled content to the last non-heading section of current page
+          const lastSection = pg.sections[pg.sections.length - 1];
+          if (lastSection && !lastSection.isHeading) {
+            lastSection.content = (lastSection.content ? lastSection.content + '\n' : '') + pulled.join('\n');
+            nextSection.content = remaining.join('\n');
+          }
+        }
+
+        // Remove pages that are now empty (keep at least page 1)
+        const cleaned = pages.filter((p: PageConfig, i: number) =>
+          i === 0 ||
+          p.sections.some((s: TextSection) => (s.content && s.content.trim().length > 0) || (s.images && s.images.length > 0) || s.imageUrl)
+        );
+        cleaned.forEach((p: PageConfig, i: number) => { p.pageNumber = i + 1; });
+        return {
+          pages: cleaned,
+          currentPageIndex: Math.min(state.currentPageIndex, cleaned.length - 1)
+        };
+      }
+
       return { pages, currentPageIndex: didSplit ? pages.length - 1 : state.currentPageIndex };
     });
   },
@@ -484,28 +577,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   setText: (text) => {
     get().saveHistory();
     set((state) => {
-      const rawLines = text.split('\n');
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
       const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
+      const wrappedLines = wrapTextByWords(text, charsPerLine);
       const pages: PageConfig[] = [];
-      let currentLines: string[] = [];
-      let currentVisualRows = 0;
-      for (const line of rawLines) {
-        const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-        if (currentVisualRows + lineVisualRows > limit && currentLines.length > 0) {
+      let currentPageLines: string[] = [];
+      for (const line of wrappedLines) {
+        if (currentPageLines.length >= limit) {
           const page = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-          page.sections[0].content = currentLines.join('\n');
+          page.sections[0].content = currentPageLines.join('\n');
           pages.push(page);
-          currentLines = [line];
-          currentVisualRows = lineVisualRows;
+          currentPageLines = [line];
         } else {
-          currentLines.push(line);
-          currentVisualRows += lineVisualRows;
+          currentPageLines.push(line);
         }
       }
-      if (currentLines.length > 0 || pages.length === 0) {
+      if (currentPageLines.length > 0 || pages.length === 0) {
         const page = createDefaultPage(pages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-        page.sections[0].content = currentLines.join('\n');
+        page.sections[0].content = currentPageLines.join('\n');
         pages.push(page);
       }
       return { pages, currentPageIndex: 0 };
@@ -516,28 +605,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveHistory();
     set((state) => {
       const allText = state.pages.flatMap(p => p.sections.map(s => s.content)).join('\n');
-      const rawLines = allText.split('\n');
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
       const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
+      const wrappedLines = wrapTextByWords(allText, charsPerLine);
       const newPages: PageConfig[] = [];
-      let currentLines: string[] = [];
-      let currentVisualRows = 0;
-      for (const line of rawLines) {
-        const lineVisualRows = Math.max(1, Math.ceil(line.length / charsPerLine));
-        if (currentVisualRows + lineVisualRows > limit && currentLines.length > 0) {
+      let currentPageLines: string[] = [];
+      for (const line of wrappedLines) {
+        if (currentPageLines.length >= limit) {
           const page = createDefaultPage(newPages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-          page.sections[0].content = currentLines.join('\n');
+          page.sections[0].content = currentPageLines.join('\n');
           newPages.push(page);
-          currentLines = [line];
-          currentVisualRows = lineVisualRows;
+          currentPageLines = [line];
         } else {
-          currentLines.push(line);
-          currentVisualRows += lineVisualRows;
+          currentPageLines.push(line);
         }
       }
-      if (currentLines.length > 0 || newPages.length === 0) {
+      if (currentPageLines.length > 0 || newPages.length === 0) {
         const page = createDefaultPage(newPages.length + 1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
-        page.sections[0].content = currentLines.join('\n');
+        page.sections[0].content = currentPageLines.join('\n');
         newPages.push(page);
       }
       return { pages: newPages, currentPageIndex: 0 };
@@ -576,10 +661,58 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadNote: (id) => set((state) => {
     const note = state.notes.find(n => n.id === id);
     if (!note) return state;
+
+    // Auto-rebalance on load: re-flow all content with current parameters
+    // This fixes old notes that were stored with different charWidth/lineLimit params
+    const sizeId = note.sizeId;
+    const margins = state.globalMargins;
+    const limit = getLineLimit(sizeId, margins);
+    const charsPerLine = getCharsPerLine(sizeId, margins);
+
+    // Collect all text from all sections across all pages
+    const allText = note.pages
+      .flatMap(p => p.sections.map(s => s.content || ''))
+      .join('\n');
+    // Remove consecutive blank lines (more than 2 blank lines → trim to 2)
+    const cleanedText = allText.replace(/\n{3,}/g, '\n\n');
+    const wrappedLines = wrapTextByWords(cleanedText, charsPerLine);
+
+    const rebalancedPages: PageConfig[] = [];
+    let currentPageLines: string[] = [];
+    for (const line of wrappedLines) {
+      if (currentPageLines.length >= limit) {
+        const page = createDefaultPage(
+          rebalancedPages.length + 1,
+          state.globalStyleId,
+          state.globalColorId,
+          sizeId,
+          state.globalLayoutId,
+          margins
+        );
+        page.sections[0].content = currentPageLines.join('\n');
+        rebalancedPages.push(page);
+        currentPageLines = [line];
+      } else {
+        currentPageLines.push(line);
+      }
+    }
+    if (currentPageLines.length > 0 || rebalancedPages.length === 0) {
+      const page = createDefaultPage(
+        rebalancedPages.length + 1,
+        state.globalStyleId,
+        state.globalColorId,
+        sizeId,
+        state.globalLayoutId,
+        margins
+      );
+      page.sections[0].content = currentPageLines.join('\n');
+      rebalancedPages.push(page);
+    }
+
     return {
       activeNoteId: id,
-      pages: note.pages,
-      globalSizeId: note.sizeId,
+      pages: rebalancedPages,
+      globalSizeId: sizeId,
       currentPageIndex: 0,
       past: [],
       future: []

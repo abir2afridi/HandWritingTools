@@ -1,7 +1,7 @@
 import { useAppStore } from '@/lib/handwriting/store';
 import { HANDWRITING_STYLES, INK_COLORS } from '@/lib/handwriting/types';
 import { cn } from '@/lib/utils';
-import { Plus, Trash2, Type, PenTool, Heading1, Heading2, Heading3, List, ListOrdered, Upload, Move, Maximize2, Palette, Sparkles, Loader2, Wand2, Settings, Languages, Check } from 'lucide-react';
+import { Plus, Trash2, Type, PenTool, Heading1, Heading2, Heading3, List, ListOrdered, Upload, Move, Maximize2, Palette, Sparkles, Loader2, Wand2, Settings, Languages, Check, ClipboardPaste } from 'lucide-react';
 import { refineTextWithAI, isUsingCustomKey, setCustomAPIKey, switchToDefaultKey, switchToCustomKey, getCustomKey } from '@/lib/handwriting/aiHelper';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -539,11 +539,27 @@ export function SectionEditor({ pageIndex, page }: SectionEditorProps) {
 
             {/* Textarea */}
             <div className="relative group/textarea">
+              <div className="flex items-center justify-end gap-1 mb-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      updateSection(pageIndex, sIdx, { content: section.content + text });
+                    } catch {}
+                  }}
+                  className="h-6 px-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 hover:text-muted-foreground/80"
+                >
+                  <ClipboardPaste className="w-3 h-3 mr-1" />
+                  Paste
+                </Button>
+              </div>
               <textarea
                 value={section.content}
                 onChange={(e) => updateSection(pageIndex, sIdx, { content: e.target.value })}
                 placeholder={section.type === 'handwritten' ? 'Write your handwritten text here...' : 'Type your text here...'}
-                className="w-full min-h-[140px] bg-background rounded-lg border p-3 text-sm font-body text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring/50 transition-all pb-10"
+                className="w-full min-h-[140px] bg-background rounded-lg border p-3 text-sm font-body text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring/50 transition-all"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2 opacity-0 group-hover/textarea:opacity-100 transition-opacity">
                 <DropdownMenu>

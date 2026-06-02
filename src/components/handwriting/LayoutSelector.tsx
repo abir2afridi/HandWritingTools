@@ -35,7 +35,7 @@ export function LayoutSelector({
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {PAGE_SIZES.map((size) => (
+          {PAGE_SIZES.map((size, idx) => (
             <button
               key={size.id}
               disabled={isSizeChangeDisabled}
@@ -45,10 +45,11 @@ export function LayoutSelector({
                 selectedSizeId === size.id
                   ? "border-primary bg-primary text-primary-foreground"
                   : isSizeChangeDisabled
-                  ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed opacity-50"
-                  : "border-border bg-card text-foreground hover:border-primary/40"
+                    ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed opacity-50"
+                    : "border-border bg-card text-foreground hover:border-primary/40"
               )}
             >
+              <span className="text-[9px] font-black opacity-40 mr-1 tabular-nums">{idx + 1}.</span>
               {size.name}
               <span className="text-xs ml-1 opacity-70">({size.width}×{size.height}mm)</span>
             </button>
@@ -64,7 +65,7 @@ export function LayoutSelector({
       <div>
         <h3 className="font-display text-lg text-foreground mb-3">Paper Style</h3>
         <div className="grid grid-cols-2 gap-4">
-          {PAGE_LAYOUTS.map((layout) => (
+          {PAGE_LAYOUTS.map((layout, idx) => (
             <button
               key={layout.id}
               onClick={() => onLayoutChange(layout.id)}
@@ -75,9 +76,12 @@ export function LayoutSelector({
                   : "border-border hover:border-primary/40 bg-card hover:shadow-md"
               )}
             >
+              <span className="absolute top-2 left-2 text-[9px] font-black text-muted-foreground/20 tabular-nums">
+                {String(idx + 1).padStart(2, '0')}
+              </span>
               <div className={cn(
                 "w-full aspect-[4/3] rounded-lg mb-3 shadow-inner border border-black/5",
-                layout.id === 'aged' ? '' : 'bg-paper-white',
+                (layout.paperClass.includes('bg-') || ['aged', 'blueprint', 'legal-pad', 'dark-grid', 'blackboard', 'parchment', 'realistic-white'].includes(layout.id)) ? '' : 'bg-paper-white',
                 layout.paperClass
               )} />
               <span className="text-xs font-medium text-foreground">{layout.name}</span>
