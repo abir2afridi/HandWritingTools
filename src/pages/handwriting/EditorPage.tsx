@@ -95,8 +95,10 @@ const EditorPage = () => {
       const containerWidth = scrollContainerRef.current.clientWidth;
       const size = PAGE_SIZES.find(s => s.id === globalSizeId) || PAGE_SIZES[0];
       
-      const availableWidth = containerWidth - (isMobile ? 32 : 80); 
-      let newScale = availableWidth / (size.width * 2.5);
+      const navWidth = isMobile ? 40 : 60;
+      const availableWidth = containerWidth - navWidth; 
+      const baseScale = size.width * 2.8;
+      let newScale = availableWidth / baseScale;
       
       if (newScale > 1.2) newScale = 1.2;
       if (newScale < 0.3) newScale = 0.3;
@@ -478,13 +480,24 @@ const EditorPage = () => {
 
               <div className="h-4 w-[1px] bg-border/40" />
              
-             <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                   <div className={cn("w-1.5 h-1.5 rounded-full", isSaved ? "bg-green-500" : "bg-primary animate-pulse")} />
-                   <p className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-[0.15em]">Private Draft</p>
-                </div>
-                
-                <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-lg border border-border/20">
+              <div className="flex items-center gap-6">
+                 <div className="flex items-center gap-2">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", isSaved ? "bg-green-500" : "bg-primary animate-pulse")} />
+                    <p className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-[0.15em]">Private Draft</p>
+                 </div>
+
+                 <div className="h-4 w-[1px] bg-border/40" />
+
+                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                    <FileText className="h-3 w-3 text-primary/60" />
+                    <span className="text-[10px] font-black text-primary/80 tracking-wider">
+                       Page {currentPageIndex + 1} / {pages.length}
+                    </span>
+                 </div>
+
+                 <div className="h-4 w-[1px] bg-border/40" />
+                 
+                 <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-lg border border-border/20">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <ZoomOut className="h-3 w-3 opacity-30 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => handleManualZoom(Math.max(0.3, zoomScale - 0.1))} />
@@ -576,7 +589,7 @@ const EditorPage = () => {
           {/* LEFT PANEL: PAGE SEGMENTS */}
            <div className={cn(
              "border-r border-border/40 bg-[#fafafa] flex flex-col h-full overflow-hidden z-20 shrink-0 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-all duration-300",
-             isMobile ? "fixed inset-y-0 left-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[340px] xl:w-[440px]",
+              isMobile ? "fixed inset-y-0 left-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[280px] xl:w-[360px]",
              isMobile && !showLeftPanel && "-translate-x-full opacity-0 pointer-events-none",
              isMobile && showLeftPanel && "translate-x-0 opacity-100"
            )}>
@@ -756,38 +769,38 @@ const EditorPage = () => {
               </AnimatePresence>
 
 {/* SIMPLIFIED PAGE NAVIGATION (CLEAN SIDEBAR) */}
-             <div className="w-14 md:w-20 border-r border-border/40 bg-white flex flex-col items-center py-6 gap-4 shrink-0 overflow-y-auto no-scrollbar z-30">
+             <div className="w-10 md:w-14 lg:w-16 border-r border-border/40 bg-white flex flex-col items-center py-4 md:py-5 gap-3 md:gap-3.5 shrink-0 overflow-y-auto no-scrollbar z-30">
                 {pages.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => scrollToPage(i)}
                     className={cn(
-                      "w-14 h-20 rounded-xl transition-all duration-300 flex flex-col items-center justify-center gap-1 border relative group shrink-0",
+                      "w-9 h-14 md:w-12 md:h-16 lg:w-14 lg:h-20 rounded-lg md:rounded-xl transition-all duration-300 flex flex-col items-center justify-center gap-0.5 md:gap-1 border relative group shrink-0",
                       i === currentPageIndex 
                       ? "bg-white border-primary shadow-md ring-2 ring-primary/10" 
-                      : "bg-muted/10 border-transparent hover:bg-muted/30 opacity-60 hover:opacity-100"
+                      : "bg-muted/10 border-transparent hover:bg-muted/30 opacity-50 hover:opacity-100"
                     )}
                   >
-                     <div className={cn("w-6 h-0.5 rounded-full transition-colors", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
-                     <div className={cn("w-4 h-0.5 rounded-full transition-colors opacity-40", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
-                     <span className={cn("text-[10px] font-bold transition-colors mt-1", i === currentPageIndex ? "text-primary" : "text-muted-foreground")}>{i + 1}</span>
+                     <div className={cn("w-3.5 h-0.5 md:w-5 md:h-0.5 rounded-full transition-colors", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
+                     <div className={cn("w-2.5 h-0.5 md:w-3.5 md:h-0.5 rounded-full transition-colors opacity-40 hidden md:block", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
+                     <span className={cn("text-[9px] md:text-[10px] font-bold transition-colors mt-0.5 md:mt-1", i === currentPageIndex ? "text-primary" : "text-muted-foreground")}>{i + 1}</span>
                   </button>
                 ))}
                 
                 <button 
                   onClick={addPage} 
-                  className="w-12 h-12 rounded-xl border-border/8 border-dashed border-2 flex items-center justify-center hover:bg-muted/20 hover:border-primary transition-all opacity-40 hover:opacity-100"
+                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border-border/8 border-dashed border-2 flex items-center justify-center hover:bg-muted/20 hover:border-primary transition-all opacity-40 hover:opacity-100"
                 >
-                   <Plus className="h-4 w-4" />
+                   <Plus className="h-3 w-3 md:h-3.5 md:w-3.5" />
                 </button>
              </div>
  
              {/* MAIN SCROLL AREA: CLEAN & FOCUSED */}
              <div
                ref={scrollContainerRef}
-               className="flex-1 overflow-y-auto px-4 md:px-10 py-10 md:py-20 bg-[#f4f4f7] space-y-12 scroll-smooth no-scrollbar"
+               className="flex-1 overflow-y-auto px-3 md:px-6 py-6 md:py-10 bg-[#f4f4f7] scroll-smooth no-scrollbar"
              >
-                <div className="flex flex-col items-center gap-16 w-full mx-auto pb-[50vh]">
+                <div className="flex flex-col items-center gap-10 md:gap-14 w-full mx-auto pb-[30vh]">
                    {pages.map((page, i) => {
                       const size = PAGE_SIZES.find(s => s.id === page.sizeId) || PAGE_SIZES[0];
                       const displayWidth = size.width * 2.5 * zoomScale;
@@ -800,8 +813,8 @@ const EditorPage = () => {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.5 }}
                           className={cn(
-                            "relative transition-all duration-500",
-                            i === currentPageIndex ? "z-10" : "z-0 opacity-40"
+                            "relative transition-all duration-500 group/page",
+                            i === currentPageIndex ? "z-10" : "z-0 opacity-60 hover:opacity-90"
                           )}
                           onClick={() => setCurrentPage(i)}
                         >
@@ -815,7 +828,7 @@ const EditorPage = () => {
                                  className={cn(
                                   "bg-white ring-1 ring-border/10 absolute top-0 left-0",
                                   i === currentPageIndex 
-                                  ? "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1),0_0_1px_rgba(0,0,0,0.1)]" 
+                                  ? "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1),0_0_1px_rgba(0,0,0,0.1)] z-20" 
                                   : "shadow-sm"
                                 )}
                                 style={{ 
@@ -845,11 +858,11 @@ const EditorPage = () => {
                            </div>
 
                          {/* SUBTLE PAGE INDICATOR */}
-                         <div className="absolute top-0 -left-8 h-full hidden lg:flex items-center justify-center">
+                         <div className="absolute top-0 -left-7 md:-left-8 h-full hidden md:flex items-center justify-center">
                             <span 
                               className={cn(
-                                "text-[10px] font-bold uppercase tracking-widest transition-all",
-                                i === currentPageIndex ? "text-primary/60" : "text-transparent"
+                                "text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all",
+                                i === currentPageIndex ? "text-primary/60" : "text-transparent group-hover/page:text-muted-foreground/30"
                               )}
                               style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
                             >
@@ -866,7 +879,7 @@ const EditorPage = () => {
            {/* RIGHT PANEL: EDITOR SETTINGS */}
            <div className={cn(
              "border-l border-border/40 bg-[#fafafa] flex flex-col h-full overflow-hidden z-20 shrink-0 transition-all duration-300",
-             isMobile ? "fixed inset-y-0 right-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[340px] xl:w-[440px]",
+              isMobile ? "fixed inset-y-0 right-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[280px] xl:w-[360px]",
              isMobile && !showRightPanel && "translate-x-full opacity-0 pointer-events-none",
              isMobile && showRightPanel && "translate-x-0 opacity-100"
            )}>
