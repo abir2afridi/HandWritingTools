@@ -9,13 +9,15 @@ interface PagePreviewProps {
   showMargin: boolean;
   showPageNumber: boolean;
   inkSmudge: boolean;
+  customPaperUrl?: string;
+  customPaperOpacity?: number;
   scale?: number;
   showGuidelines?: boolean;
   onImageUpdate?: (sectionId: string, imageIndex: number, updates: { x: number, y: number }) => void;
 }
 
 export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
-  ({ page, showMargin, showPageNumber, inkSmudge, scale = 1, showGuidelines = false, onImageUpdate }, ref) => {
+  ({ page, showMargin, showPageNumber, inkSmudge, customPaperUrl, customPaperOpacity = 100, scale = 1, showGuidelines = false, onImageUpdate }, ref) => {
     const layout = PAGE_LAYOUTS.find(l => l.id === page.layoutId) || PAGE_LAYOUTS[0];
     const size = PAGE_SIZES.find(s => s.id === page.sizeId) || PAGE_SIZES[0];
 
@@ -23,12 +25,15 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
     const widthPx = size.width * 2.5;
     const heightPx = size.height * 2.5;
 
+    const isCustom = page.layoutId === 'custom';
+    const bgImage = isCustom && customPaperUrl ? customPaperUrl : undefined;
+
     return (
       <div
         ref={ref}
         className={cn(
           "shadow-xl relative overflow-hidden rounded-sm",
-          layout.paperClass,
+          !isCustom && layout.paperClass,
           showMargin && "paper-margin"
         )}
         style={{
@@ -42,6 +47,17 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
           lineHeight: `${32 * scale}px`,
         }}
       >
+        {isCustom && bgImage && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `url(${bgImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: customPaperOpacity / 100,
+            }}
+          />
+        )}
         {page.sections.map((section) => {
           const color = INK_COLORS.find(c => c.id === section.colorId);
 

@@ -13,7 +13,7 @@ import { motion } from 'framer-motion';
 import { WizardTools } from '@/components/handwriting/WizardTools';
 
 const ExportPage = () => {
-  const { pages, showMargin, showPageNumbers, inkSmudge } = useAppStore();
+  const { pages, showMargin, showPageNumbers, inkSmudge, customPaperUrl, customPaperOpacity } = useAppStore();
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [exporting, setExporting] = useState<string | null>(null);
 
@@ -159,6 +159,8 @@ const ExportPage = () => {
                 showMargin={showMargin}
                 showPageNumber={showPageNumbers}
                 inkSmudge={inkSmudge}
+                customPaperUrl={customPaperUrl}
+                customPaperOpacity={customPaperOpacity}
                 scale={0.85}
               />
             </motion.div>

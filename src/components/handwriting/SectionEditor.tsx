@@ -39,7 +39,7 @@ function FormatButton({ icon: Icon, label, onClick, active }: { icon: React.Comp
 }
 
 export function SectionEditor({ pageIndex, page }: SectionEditorProps) {
-  const { updateSection, addSection, removeSection, setGlobalStyle, setGlobalColor } = useAppStore();
+  const { updateSection, addSection, removeSection, setGlobalStyle, setGlobalColor, globalColorId } = useAppStore();
   const [applyToAll, setApplyToAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramInputRef = useRef<HTMLInputElement>(null);
@@ -197,93 +197,7 @@ export function SectionEditor({ pageIndex, page }: SectionEditorProps) {
                   </Select>
                 )}
 
-                {/* Ink color buttons */}
-                <div className="flex gap-1 items-center">
-                  {INK_COLORS.slice(0, 6).map(c => (
-                    <Tooltip key={c.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => {
-                            if (applyToAll) setGlobalColor(c.id, true);
-                            else updateSection(pageIndex, sIdx, { colorId: c.id, customColor: undefined });
-                          }}
-                          className={cn(
-                            "w-6 h-6 rounded-full border-2 transition-all hover:scale-110",
-                            section.colorId === c.id && !section.customColor ? "border-foreground scale-110 shadow-md" : "border-border"
-                          )}
-                          style={{ backgroundColor: c.value }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">{c.name}</TooltipContent>
-                    </Tooltip>
-                  ))}
 
-                  {/* Color Picker */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        className={cn(
-                          "w-6 h-6 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center",
-                          section.customColor ? "border-foreground scale-110 shadow-md" : "border-border bg-secondary"
-                        )}
-                        style={section.customColor ? { backgroundColor: section.customColor } : undefined}
-                      >
-                        {!section.customColor && <Palette className="h-3 w-3 text-muted-foreground" />}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-3" side="bottom">
-                      <div className="flex items-center justify-between mb-3 border-b border-border/10 pb-2">
-                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Ink Controls</Label>
-                        <label className="flex items-center gap-1.5 cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            checked={applyToAll} 
-                            onChange={(e) => setApplyToAll(e.target.checked)} 
-                            className="w-3 h-3 rounded"
-                          />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">Apply to all</span>
-                        </label>
-                      </div>
-                      <Label className="text-xs font-medium mb-2 block">Custom Ink Color</Label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="color"
-                          value={section.customColor || '#1a5276'}
-                          onChange={(e) => updateSection(pageIndex, sIdx, { customColor: e.target.value })}
-                          className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
-                        />
-                        <Input
-                          value={section.customColor || ''}
-                          onChange={(e) => updateSection(pageIndex, sIdx, { customColor: e.target.value })}
-                          placeholder="#1a5276"
-                          className="text-xs h-8"
-                        />
-                      </div>
-                      {section.customColor && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 w-full text-xs"
-                          onClick={() => updateSection(pageIndex, sIdx, { customColor: undefined })}
-                        >
-                          Reset to preset
-                        </Button>
-                      )}
-                      {/* More preset colors */}
-                      <div className="flex gap-1.5 flex-wrap mt-3 pt-2 border-t">
-                        {INK_COLORS.map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => updateSection(pageIndex, sIdx, { colorId: c.id, customColor: undefined })}
-                            className="w-5 h-5 rounded-full border border-border hover:scale-110 transition-all"
-                            style={{ backgroundColor: c.value }}
-                            title={c.name}
-                          />
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
               </div>
 
               <button
@@ -559,7 +473,7 @@ export function SectionEditor({ pageIndex, page }: SectionEditorProps) {
                 value={section.content}
                 onChange={(e) => updateSection(pageIndex, sIdx, { content: e.target.value })}
                 placeholder={section.type === 'handwritten' ? 'Write your handwritten text here...' : 'Type your text here...'}
-                className="w-full min-h-[140px] bg-background rounded-lg border p-3 text-sm font-body text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring/50 transition-all"
+                className="w-full min-h-[140px] bg-background rounded-lg p-3 text-sm font-body text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring/50 transition-all"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2 opacity-0 group-hover/textarea:opacity-100 transition-opacity">
                 <DropdownMenu>
@@ -650,6 +564,93 @@ export function SectionEditor({ pageIndex, page }: SectionEditorProps) {
                 </DropdownMenu>
               </div>
             </div>
+
+            {/* Unified Ink Color */}
+            <div className="px-3 pb-3 pt-2 border-t border-border/20">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[8px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
+                  <Palette className="h-2.5 w-2.5" /> Ink Color
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] font-black tracking-widest uppercase text-muted-foreground/60">
+                    {applyToAll
+                      ? (INK_COLORS.find(c => c.id === globalColorId)?.name || 'Custom')
+                      : (section.customColor || INK_COLORS.find(c => c.id === section.colorId)?.name || 'Custom')}
+                  </span>
+                  <label className="flex items-center gap-1 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={applyToAll}
+                      onChange={(e) => setApplyToAll(e.target.checked)}
+                      className="w-2.5 h-2.5 rounded"
+                    />
+                    <span className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/50 group-hover:text-primary transition-colors">All</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {INK_COLORS.map((color) => {
+                  const isActive = applyToAll
+                    ? globalColorId === color.id
+                    : section.colorId === color.id && !section.customColor;
+                  return (
+                    <button
+                      key={color.id}
+                      onClick={() => {
+                        if (applyToAll) setGlobalColor(color.id, true);
+                        else updateSection(pageIndex, sIdx, { colorId: color.id, customColor: undefined });
+                      }}
+                      className={cn(
+                        "w-6 h-6 rounded-full border-2 transition-all flex items-center justify-center relative",
+                        isActive
+                          ? "border-primary scale-110 shadow-md"
+                          : "border-transparent hover:scale-105"
+                      )}
+                      style={{ backgroundColor: color.value }}
+                    >
+                      {isActive && <Check className="h-2.5 w-2.5 text-white drop-shadow-md" />}
+                    </button>
+                  );
+                })}
+                <div className="relative group flex items-center gap-1">
+                  <input
+                    type="color"
+                    value={
+                      applyToAll
+                        ? (INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276')
+                        : (section.customColor || INK_COLORS.find(c => c.id === section.colorId)?.value || '#1a5276')
+                    }
+                    onChange={(e) => {
+                      if (applyToAll) setGlobalColor(e.target.value, true);
+                      else updateSection(pageIndex, sIdx, { customColor: e.target.value });
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                  />
+                  <div className={cn(
+                    "w-6 h-6 rounded-full border-2 border-dashed flex items-center justify-center transition-all cursor-pointer",
+                    (applyToAll
+                      ? !INK_COLORS.some(c => c.id === globalColorId)
+                      : !!section.customColor)
+                      ? "border-primary scale-110 bg-primary/5"
+                      : "border-muted-foreground/30 hover:border-primary/50 group-hover:scale-105"
+                  )}>
+                    <div
+                      className="w-3 h-3 rounded-full shadow-inner"
+                      style={{
+                        backgroundColor: applyToAll
+                          ? (!INK_COLORS.some(c => c.id === globalColorId) ? globalColorId : '#e2e8f0')
+                          : (section.customColor || '#e2e8f0')
+                      }}
+                    />
+                  </div>
+                  <span className="text-[7px] font-bold text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors uppercase tracking-wider">Custom</span>
+                </div>
+              </div>
+              <p className="text-[7px] text-muted-foreground/40 font-medium uppercase tracking-wider mt-1.5">
+                {applyToAll ? 'Applies to all pages' : 'Applies to this section only'}
+              </p>
+            </div>
+
           </motion.div>
         ))}
       </AnimatePresence>

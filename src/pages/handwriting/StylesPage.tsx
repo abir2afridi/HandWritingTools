@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 
 const StylesPage = () => {
-  const { globalStyleId, globalColorId, setGlobalStyle, setGlobalColor, pages, showMargin, showPageNumbers, inkSmudge } = useAppStore();
+  const { globalStyleId, globalColorId, setGlobalStyle, setGlobalColor, pages, showMargin, showPageNumbers, inkSmudge, customPaperUrl, customPaperOpacity } = useAppStore();
   const [applyStyleToAll, setApplyStyleToAll] = useState(true);
 
   return (
@@ -76,6 +76,8 @@ const StylesPage = () => {
                     showMargin={showMargin}
                     showPageNumber={showPageNumbers}
                     inkSmudge={inkSmudge}
+                    customPaperUrl={customPaperUrl}
+                    customPaperOpacity={customPaperOpacity}
                     scale={0.65}
                   />
                 </motion.div>

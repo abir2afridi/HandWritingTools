@@ -2,47 +2,46 @@ import { LayoutSelector } from './LayoutSelector';
 
 interface PaperStyleTabProps {
   selectedLayoutId: string;
-  selectedSizeId: string;
   showMargin: boolean;
   showPageNumbers: boolean;
   inkSmudge: boolean;
+  customPaperUrl: string;
   applyLayoutToAll: boolean;
   onLayoutChange: (id: string) => void;
-  onSizeChange: (id: string) => void;
   onMarginChange: (v: boolean) => void;
   onPageNumbersChange: (v: boolean) => void;
   onInkSmudgeChange: (v: boolean) => void;
+  onCustomPaperUpload: (url: string) => void;
   onApplyLayoutToAllChange: (v: boolean) => void;
 }
 
 export function PaperStyleTab({
   selectedLayoutId,
-  selectedSizeId,
   showMargin,
   showPageNumbers,
   inkSmudge,
+  customPaperUrl,
   applyLayoutToAll,
   onLayoutChange,
-  onSizeChange,
   onMarginChange,
   onPageNumbersChange,
   onInkSmudgeChange,
+  onCustomPaperUpload,
   onApplyLayoutToAllChange,
 }: PaperStyleTabProps) {
   return (
     <div className="p-6 pt-4 space-y-6">
       <LayoutSelector
         selectedLayoutId={selectedLayoutId}
-        selectedSizeId={selectedSizeId}
         showMargin={showMargin}
         showPageNumbers={showPageNumbers}
         inkSmudge={inkSmudge}
-        isSizeChangeDisabled={true}
+        customPaperUrl={customPaperUrl}
         onLayoutChange={onLayoutChange}
-        onSizeChange={onSizeChange}
         onMarginChange={onMarginChange}
         onPageNumbersChange={onPageNumbersChange}
         onInkSmudgeChange={onInkSmudgeChange}
+        onCustomPaperUpload={onCustomPaperUpload}
       />
 
       <div className="flex items-center justify-between pt-5 mt-4 border-t border-border/10">

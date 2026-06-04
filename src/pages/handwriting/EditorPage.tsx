@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
   Plus, Trash2, ClipboardPaste, Download, Image as ImageIcon, 
-  Loader2, Type, Maximize, FileDown, Layers, ChevronRight, 
+  Loader2, Maximize, FileDown, Layers, ChevronRight, 
   Menu, ZoomIn, ZoomOut, Search, ArrowLeft, MoreVertical, 
-  Palette, Settings, Sparkles, ArrowRight, Save, Layout, Info, Scissors, RotateCcw,
+  Settings, Sparkles, ArrowRight, Save, Layout, Info, Scissors, RotateCcw,
   Cloud, Check, FileText, PenTool, ChevronDown, X, PanelLeftClose, PanelRightClose,
   Undo2, Redo2
 } from 'lucide-react';
@@ -38,22 +38,6 @@ import { PAGE_SIZES, INK_COLORS } from '@/lib/handwriting/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const MinimalHeader = ({ icon: Icon, title, count }: { icon: React.ElementType, title: string, count?: number }) => (
-  <div className="flex items-center justify-between mb-4 px-1">
-    <div className="flex items-center gap-2.5">
-      <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center">
-        <Icon className="h-3.5 w-3.5 text-primary" />
-      </div>
-      <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest">{title}</h3>
-    </div>
-    {count !== undefined && (
-      <span className="text-[10px] font-black text-muted-foreground bg-muted px-2 py-0.5 rounded-full uppercase">
-        {count} items
-      </span>
-    )}
-  </div>
-);
-
 const EditorPage = () => {
   const { 
     pages, currentPageIndex, setCurrentPage, addPage, removePage, 
@@ -61,6 +45,8 @@ const EditorPage = () => {
     inkSmudge, setInkSmudge, setGlobalStyle, setGlobalColor, setGlobalSize, setGlobalLayout,
     globalStyleId, globalColorId, globalSizeId, globalLayoutId,
     globalMargins, setGlobalMargins,
+    customPaperUrl, setCustomPaperUrl,
+    customPaperOpacity, setCustomPaperOpacity,
     notes, activeNoteId, createNote, loadNote, deleteNote, renameNote, persistActiveNote,
     updateSection,
     undo, redo, past, future
@@ -238,11 +224,30 @@ const EditorPage = () => {
               </div>
               <div className="flex flex-col">
                 <h1 className="text-sm font-black tracking-tight text-foreground uppercase">Assignments Gallery</h1>
-                <div className="flex items-center gap-4">
-                   <div className="flex items-center gap-1">
-                      <Maximize className="h-2 w-2" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">{globalSizeId.toUpperCase()}</span>
-                   </div>
+                   <div className="flex items-center gap-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1 hover:text-primary transition-colors">
+                            <Maximize className="h-2 w-2" />
+                            <span className="text-[8px] font-black uppercase tracking-widest">{globalSizeId.toUpperCase()}</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[140px]">
+                          {PAGE_SIZES.map((size) => (
+                            <DropdownMenuItem
+                              key={size.id}
+                              onClick={() => setGlobalSize(size.id, true)}
+                              className={cn(
+                                "text-[11px] font-bold uppercase tracking-wider",
+                                globalSizeId === size.id && "text-primary"
+                              )}
+                            >
+                              {size.name}
+                              <span className="ml-auto text-[9px] text-muted-foreground">{size.width}×{size.height}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                    <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
                    <div className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: globalColorId }} />
@@ -322,9 +327,9 @@ const EditorPage = () => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </motion.div>
-                ))}
+                    ))}
+                  </div>
                 </div>
-             </div>
 
               {notes.length === 0 && (
                 <div className="flex flex-col items-center justify-center min-h-[50vh] text-center opacity-30 mt-12 py-20 relative z-10">
@@ -603,47 +608,43 @@ const EditorPage = () => {
                   <X className="h-4 w-4" />
                 </Button>
               )}
-              <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
-                <div className="p-4 pb-2">
-                   <div className="flex items-center justify-between gap-2">
-                      <div className="flex flex-col min-w-0">
-                        <h2 className="text-sm font-bold tracking-tight text-foreground leading-none">Content Editor</h2>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[9px] text-muted-foreground/50 font-medium uppercase tracking-widest">Manage structure</p>
-                          <div className="h-1 w-1 rounded-full bg-border" />
-                          <label className="flex items-center gap-1 cursor-pointer group">
-                             <input 
-                               type="checkbox" 
-                               checked={applyStyleToAll} 
-                               onChange={(e) => setApplyStyleToAll(e.target.checked)}
-                               className="w-2.5 h-2.5 rounded border-primary/20 accent-primary"
-                             />
-                             <span className="text-[8px] font-black uppercase tracking-widest text-primary/40 group-hover:text-primary transition-colors">Apply to all</span>
-                          </label>
-                        </div>
+               <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
+                 <div className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                       <div className="flex items-center gap-2 min-w-0">
+                         <h2 className="text-xs font-black tracking-tight text-foreground uppercase">Editor</h2>
+                         <label className="flex items-center gap-1 cursor-pointer group shrink-0">
+                            <input 
+                              type="checkbox" 
+                              checked={applyStyleToAll} 
+                              onChange={(e) => setApplyStyleToAll(e.target.checked)}
+                              className="w-2.5 h-2.5 rounded border-primary/20 accent-primary"
+                            />
+                            <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 group-hover:text-primary transition-colors">All</span>
+                         </label>
+                       </div>
+                      <div className="flex gap-1">
+                        <Button 
+                         variant="ghost" 
+                         size="icon" 
+                         onClick={() => useAppStore.getState().rebalancePages()} 
+                         className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-primary transition-all"
+                         title="Rebalance Pages"
+                        >
+                          <Layers className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                         variant={showBulk ? "outline" : "ghost"} 
+                         size="sm" 
+                         onClick={() => setShowBulk(!showBulk)} 
+                         className="h-6 px-2 text-[8px] font-bold uppercase tracking-widest rounded-md transition-all"
+                        >
+                          {showBulk ? "Close" : "Import"}
+                        </Button>
                       </div>
-                     <div className="flex gap-1.5">
-                       <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => useAppStore.getState().rebalancePages()} 
-                        className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground/60 hover:text-primary transition-all bg-muted/20 hover:shadow-sm"
-                        title="Rebalance Pages"
-                       >
-                         <Layers className="h-3.5 w-3.5" />
-                       </Button>
-                       <Button 
-                        variant={showBulk ? "outline" : "default"} 
-                        size="sm" 
-                        onClick={() => setShowBulk(!showBulk)} 
-                        className="h-7 px-2.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all shadow-none"
-                       >
-                         {showBulk ? "Close" : "Import"}
-                       </Button>
-                     </div>
-                   </div>
-                </div>
-              </div>
+                    </div>
+                 </div>
+               </div>
 
              <div className="flex-1 overflow-y-auto p-4 pt-3 pb-16 scrollbar-none scroll-smooth">
 <AnimatePresence>
@@ -691,9 +692,7 @@ const EditorPage = () => {
                 </AnimatePresence>
 
                 {/* Content Editor */}
-                <section className="space-y-3">
-                   <MinimalHeader icon={Type} title="Segments" count={pages[currentPageIndex]?.sections.length} />
-                   
+                <section className="space-y-3">                   
                    <div className="bg-white border border-border/40 rounded-xl p-4 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 rounded-lg mb-4 border border-border/10">
                         <Button
@@ -742,7 +741,7 @@ const EditorPage = () => {
                           />
                         </motion.div>
                       </AnimatePresence>
-                      
+
                       <div className="grid grid-cols-2 gap-3 pt-4 border-t border-muted/60 mt-4">
                         <Button variant="outline" size="sm" onClick={addPage} className="h-10 gap-2 text-[9px] font-black uppercase tracking-widest border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-all rounded-xl">
                            <Plus className="h-3.5 w-3.5 text-primary" /> Insert Paper
@@ -760,14 +759,15 @@ const EditorPage = () => {
                             <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
                           </Button>
                         )}
-                      </div>
-                   </div>
-                </section>
+                        </div>
 
-                           </div>
-           </div>
+                     </div>
+                   </section>
+                  </div>
 
-           {/* CENTER: PREVIEW PORT */}
+                            </div>
+
+            {/* CENTER: PREVIEW PORT */}
            <div className={cn(
              "flex-1 bg-[#fcfcfd] flex flex-row overflow-hidden relative shadow-inner overflow-x-hidden",
              "transition-all duration-300 ease-out"
@@ -853,13 +853,15 @@ const EditorPage = () => {
                                   height: size.height * 2.5 * zoomScale
                                 }}
                                >
-                                <PagePreview
-                                   page={page}
-                                   showMargin={page.showMargin}
-                                   showPageNumber={page.showPageNumber}
-                                   inkSmudge={page.inkSmudge}
-                                   scale={zoomScale}
-                                   showGuidelines={isEditingMargins}
+                                 <PagePreview
+                                    page={page}
+                                    showMargin={page.showMargin}
+                                    showPageNumber={page.showPageNumber}
+                                    inkSmudge={page.inkSmudge}
+                                    customPaperUrl={customPaperUrl}
+                                    customPaperOpacity={customPaperOpacity}
+                                    scale={zoomScale}
+                                    showGuidelines={isEditingMargins}
                                    ref={setPageRef(i)}
                                    onImageUpdate={(sectionId, imgIdx, updates) => {
                                      const sectionIdx = page.sections.findIndex(s => s.id === sectionId);
@@ -937,73 +939,24 @@ const EditorPage = () => {
                       <div className="h-full overflow-y-auto">
                         <PaperStyleTab
                        selectedLayoutId={globalLayoutId}
-                       selectedSizeId={globalSizeId}
                        showMargin={showMargin}
                        showPageNumbers={showPageNumbers}
                        inkSmudge={inkSmudge}
+                       customPaperUrl={customPaperUrl}
                        applyLayoutToAll={applyLayoutToAll}
                        onLayoutChange={(id) => setGlobalLayout(id, applyLayoutToAll)}
-                       onSizeChange={(id) => setGlobalSize(id, applyLayoutToAll)}
                        onMarginChange={(v) => setShowMargin(v, applyLayoutToAll)}
                        onPageNumbersChange={(v) => setShowPageNumbers(v, applyLayoutToAll)}
                        onInkSmudgeChange={(v) => setInkSmudge(v)}
+                       onCustomPaperUpload={(url) => setCustomPaperUrl(url)}
                        onApplyLayoutToAllChange={setApplyLayoutToAll}
                      />
                       </div>
                     </TabsContent>
                   </div>
-                </Tabs>
+                 </Tabs>
 
-               {/* INK COLOR — sticky section outside tabs */}
-               <div className="shrink-0 border-t border-border/40 bg-white px-6 py-4">
-                 <div className="flex items-center justify-between mb-3">
-                   <h4 className="text-[9px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                     <Palette className="h-3 w-3" /> Ink Color
-                   </h4>
-                   <span className="text-[9px] font-black tracking-widest uppercase text-muted-foreground/60">
-                     {INK_COLORS.find(c => c.id === globalColorId)?.name || 'Custom'}
-                   </span>
-                 </div>
-                 <div className="flex gap-2.5 flex-wrap">
-                   {INK_COLORS.map((color) => (
-                     <button
-                       key={color.id}
-                       onClick={() => setGlobalColor(color.id, applyStyleToAll)}
-                       className={cn(
-                         "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center relative",
-                         globalColorId === color.id
-                           ? "border-primary scale-110 shadow-md"
-                           : "border-transparent hover:scale-105"
-                       )}
-                       style={{ backgroundColor: color.value }}
-                     >
-                       {globalColorId === color.id && <Check className="h-3 w-3 text-white drop-shadow-md" />}
-                     </button>
-                   ))}
-                    <div className="relative group flex items-center gap-1.5">
-                     <input 
-                       type="color"
-                       value={INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276'}
-                       onChange={(e) => setGlobalColor(e.target.value, applyStyleToAll)}
-                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                     />
-                     <div className={cn(
-                       "w-8 h-8 rounded-full border-2 border-dashed flex items-center justify-center transition-all cursor-pointer",
-                       !INK_COLORS.some(c => c.id === globalColorId)
-                       ? "border-primary scale-110 bg-primary/5"
-                       : "border-muted-foreground/30 hover:border-primary/50 group-hover:scale-105"
-                     )}>
-                       <div 
-                         className="w-4 h-4 rounded-full shadow-inner" 
-                         style={{ backgroundColor: !INK_COLORS.some(c => c.id === globalColorId) ? globalColorId : '#e2e8f0' }} 
-                       />
-                     </div>
-                     <span className="text-[8px] font-bold text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors uppercase tracking-wider">Custom</span>
-                   </div>
-                 </div>
-               </div>
-
-               {/* PAPER ARCHITECTURE — sticky at bottom, outside tabs */}
+                {/* PAPER ARCHITECTURE — sticky at bottom, outside tabs */}
                <div
                  className="shrink-0 border-t border-border/40 bg-white px-6 py-4"
                  onMouseEnter={() => setIsEditingMargins(true)}
@@ -1045,10 +998,35 @@ const EditorPage = () => {
                        />
                      </div>
                    ))}
+                   </div>
+                   <div className="mt-4 pt-4 border-t border-border/40 space-y-2">
+                     <div className="flex justify-between items-center px-0.5">
+                       <span className="text-[9px] font-bold text-muted-foreground/60 uppercase flex items-center gap-1.5">
+                         {(!customPaperUrl || globalLayoutId !== 'custom') && (
+                           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                           </svg>
+                         )}
+                         Paper Opacity
+                       </span>
+                       <span className="text-[9px] font-black tabular-nums" style={{ color: (!customPaperUrl || globalLayoutId !== 'custom') ? '#9ca3af' : undefined }}>
+                         {customPaperOpacity}%
+                       </span>
+                     </div>
+                     <Slider
+                       value={[customPaperOpacity]}
+                       onValueChange={(v) => setCustomPaperOpacity(v[0])}
+                       disabled={!customPaperUrl || globalLayoutId !== 'custom'}
+                       min={10}
+                       max={100}
+                       step={1}
+                       className="h-3"
+                     />
+                   </div>
                  </div>
-               </div>
-            </div>
-           {/* Hidden Capture Area */}
+              </div>
+             {/* Hidden Capture Area */}
           <div className="fixed -left-[8000px] top-0 pointer-events-none opacity-0">
               {pages.map((page, i) => (
                 <div key={`export-wrapper-${page.id}`} className="bg-white">
@@ -1057,6 +1035,8 @@ const EditorPage = () => {
                     showMargin={showMargin}
                     showPageNumber={showPageNumbers}
                     inkSmudge={inkSmudge}
+                    customPaperUrl={customPaperUrl}
+                    customPaperOpacity={customPaperOpacity}
                     scale={1.5}
                   />
                 </div>

@@ -17,6 +17,14 @@ function getWordSpacing(wordIdx: number, lineIdx: number, seed: number) {
   return (hash(wordIdx * 3, lineIdx * 7, seed) - 0.5) * 3;
 }
 
+function splitGraphemes(text: string): string[] {
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    return Array.from(segmenter.segment(text), s => s.segment);
+  }
+  return Array.from(text);
+}
+
 export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge }: HandwritingRendererProps) => {
   const style = HANDWRITING_STYLES.find(s => s.id === section.styleId);
   const color = INK_COLORS.find(c => c.id === section.colorId);
@@ -89,7 +97,7 @@ export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge }: Ha
 
                 return (
                   <span key={wordIdx} style={{ display: 'inline-flex' }}>
-                    {word.split('').map((char, charIdx) => {
+                    {splitGraphemes(word).map((char, charIdx) => {
                       const globalCharIdx = wordIdx * 10 + charIdx;
                       const v = hash(globalCharIdx, lineIdx, seed);
                       const rotation = (v - 0.5) * 4;

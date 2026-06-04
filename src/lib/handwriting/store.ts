@@ -10,6 +10,8 @@ interface Snapshot {
   showMargin: boolean;
   showPageNumbers: boolean;
   globalMargins: { top: number, bottom: number, left: number, right: number };
+  customPaperUrl: string;
+  customPaperOpacity: number;
 }
 
 interface AppState {
@@ -23,6 +25,8 @@ interface AppState {
   showPageNumbers: boolean;
   inkSmudge: boolean;
   globalMargins: { top: number, bottom: number, left: number, right: number };
+  customPaperUrl: string;
+  customPaperOpacity: number;
   notes: Array<{ 
     id: string, 
     title: string, 
@@ -51,6 +55,8 @@ interface AppState {
   setShowMargin: (v: boolean, applyToAll?: boolean) => void;
   setShowPageNumbers: (v: boolean, applyToAll?: boolean) => void;
   setInkSmudge: (v: boolean) => void;
+  setCustomPaperUrl: (url: string) => void;
+  setCustomPaperOpacity: (opacity: number) => void;
   setPages: (pages: PageConfig[]) => void;
   updatePage: (index: number, page: Partial<PageConfig>) => void;
   addPage: () => void;
@@ -186,6 +192,8 @@ const getSnapshot = (state: AppState) => ({
   showMargin: state.showMargin,
   showPageNumbers: state.showPageNumbers,
   globalMargins: { ...state.globalMargins },
+  customPaperUrl: state.customPaperUrl,
+  customPaperOpacity: state.customPaperOpacity,
 });
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -198,6 +206,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   showMargin: true,
   showPageNumbers: true,
   inkSmudge: false,
+  customPaperUrl: '',
+  customPaperOpacity: 100,
   globalMargins: { top: 20, bottom: 20, left: 20, right: 20 },
   notes: loadNotesFromStorage(),
   activeNoteId: null,
@@ -399,7 +409,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setInkSmudge: (v) => set({ inkSmudge: v }),
-  
+
+  setCustomPaperUrl: (url) => set({ customPaperUrl: url }),
+
+  setCustomPaperOpacity: (opacity) => set({ customPaperOpacity: opacity }),
+
   setPages: (pages) => {
     get().saveHistory();
     set({ pages });

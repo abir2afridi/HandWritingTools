@@ -10,7 +10,7 @@ import { useState } from 'react';
 
 const LayoutPage = () => {
   const {
-    globalLayoutId, globalSizeId, showMargin, showPageNumbers, inkSmudge,
+    globalLayoutId, globalSizeId, showMargin, showPageNumbers, inkSmudge, customPaperUrl, customPaperOpacity,
     setGlobalLayout, setGlobalSize, setShowMargin, setShowPageNumbers, setInkSmudge,
     pages, globalStyleId, globalColorId,
   } = useAppStore();
@@ -35,12 +35,10 @@ const LayoutPage = () => {
                 <div className="bg-card border border-border/40 rounded-2xl p-6">
                   <LayoutSelector
                     selectedLayoutId={globalLayoutId}
-                    selectedSizeId={globalSizeId}
                     showMargin={showMargin}
                     showPageNumbers={showPageNumbers}
                     inkSmudge={inkSmudge}
                     onLayoutChange={(id) => setGlobalLayout(id, applyLayoutToAll)}
-                    onSizeChange={(id) => setGlobalSize(id, applyLayoutToAll)}
                     onMarginChange={(v) => setShowMargin(v, applyLayoutToAll)}
                     onPageNumbersChange={(v) => setShowPageNumbers(v, applyLayoutToAll)}
                     onInkSmudgeChange={setInkSmudge}
@@ -92,6 +90,8 @@ const LayoutPage = () => {
                     showMargin={showMargin}
                     showPageNumber={showPageNumbers}
                     inkSmudge={inkSmudge}
+                    customPaperUrl={customPaperUrl}
+                    customPaperOpacity={customPaperOpacity}
                     scale={0.65}
                   />
                 </motion.div>

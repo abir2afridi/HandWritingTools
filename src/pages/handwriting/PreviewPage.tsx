@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { WizardTools } from '@/components/handwriting/WizardTools';
 
 const PreviewPage = () => {
-  const { pages, showMargin, showPageNumbers, inkSmudge } = useAppStore();
+  const { pages, showMargin, showPageNumbers, inkSmudge, customPaperUrl, customPaperOpacity } = useAppStore();
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -40,6 +40,8 @@ const PreviewPage = () => {
                     showMargin={showMargin}
                     showPageNumber={showPageNumbers}
                     inkSmudge={inkSmudge}
+                    customPaperUrl={customPaperUrl}
+                    customPaperOpacity={customPaperOpacity}
                     scale={0.85}
                   />
                 </motion.div>
