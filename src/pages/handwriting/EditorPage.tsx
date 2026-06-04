@@ -5,6 +5,7 @@ import { HandwritingStyleTab } from '@/components/handwriting/HandwritingStyleTa
 import { PaperStyleTab } from '@/components/handwriting/PaperStyleTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAppStore } from '@/lib/handwriting/store';
+import { HANDWRITING_STYLES, INK_COLORS } from '@/lib/handwriting/types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
@@ -13,10 +14,11 @@ import {
   Menu, ZoomIn, ZoomOut, Search, ArrowLeft, MoreVertical, 
   Settings, Sparkles, ArrowRight, Save, Layout, Info, Scissors, RotateCcw,
   Cloud, Check, FileText, PenTool, ChevronDown, X, PanelLeftClose, PanelRightClose,
-  Undo2, Redo2
+  Undo2, Redo2, Palette, Heading1, Heading2, Heading3, Type, List, ListOrdered, Upload, Move
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -34,13 +36,13 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { PAGE_SIZES, INK_COLORS } from '@/lib/handwriting/types';
+import { PAGE_SIZES } from '@/lib/handwriting/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const EditorPage = () => {
   const { 
-    pages, currentPageIndex, setCurrentPage, addPage, removePage, 
+    pages, currentPageIndex, setCurrentPage, addPage, removePage, removeAllPages, addSection, 
     setText, showMargin, setShowMargin, showPageNumbers, setShowPageNumbers, 
     inkSmudge, setInkSmudge, setGlobalStyle, setGlobalColor, setGlobalSize, setGlobalLayout,
     globalStyleId, globalColorId, globalSizeId, globalLayoutId,
@@ -56,6 +58,14 @@ const EditorPage = () => {
   
   const [bulkText, setBulkText] = useState('');
   const [showBulk, setShowBulk] = useState(false);
+  const isAllBlank = useMemo(() => 
+    pages.every(p => p.sections.every(s => !s.content?.trim())),
+    [pages]
+  );
+
+  useEffect(() => {
+    if (isAllBlank) setShowBulk(true);
+  }, [isAllBlank]);
   const [exporting, setExporting] = useState<string | null>(null);
   const [zoomScale, setZoomScale] = useState(0.8);
   const [noteTitle, setNoteTitle] = useState('Untitled Note');
@@ -67,6 +77,8 @@ const EditorPage = () => {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const contentFileInputRef = useRef<HTMLInputElement>(null);
+  const contentDiagramInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const setPageRef = useCallback((index: number) => (el: HTMLDivElement | null) => {
@@ -74,6 +86,18 @@ const EditorPage = () => {
   }, []);
 
   const [isAutoZoom, setIsAutoZoom] = useState(true);
+
+  // Live clock for header
+  const [clockNow, setClockNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const clockH12 = clockNow.getHours() % 12 || 12;
+  const clockMm = String(clockNow.getMinutes()).padStart(2, '0');
+  const clockSs = String(clockNow.getSeconds()).padStart(2, '0');
+  const clockAmPm = clockNow.getHours() >= 12 ? 'PM' : 'AM';
+  const clockDate = clockNow.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
   useEffect(() => {
     const calculateScale = () => {
@@ -540,6 +564,16 @@ const EditorPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Live Clock */}
+            <div className="hidden md:flex items-center gap-1 text-sm font-mono select-none mr-1">
+              <span className="font-semibold text-foreground">{clockH12}:{clockMm}</span>
+              <span className="font-bold text-red-500">{clockSs}</span>
+              <span className="text-[10px] font-semibold text-muted-foreground ml-0.5">{clockAmPm}</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-2">{clockDate}</span>
+            </div>
+
+            <div className="h-4 w-[1px] bg-border/40 hidden md:block" />
+
             {/* Mobile panel toggles */}
             {isMobile && (
               <>
@@ -608,47 +642,78 @@ const EditorPage = () => {
                   <X className="h-4 w-4" />
                 </Button>
               )}
-               <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
-                 <div className="px-4 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                       <div className="flex items-center gap-2 min-w-0">
-                         <h2 className="text-xs font-black tracking-tight text-foreground uppercase">Editor</h2>
-                         <label className="flex items-center gap-1 cursor-pointer group shrink-0">
-                            <input 
-                              type="checkbox" 
-                              checked={applyStyleToAll} 
-                              onChange={(e) => setApplyStyleToAll(e.target.checked)}
-                              className="w-2.5 h-2.5 rounded border-primary/20 accent-primary"
-                            />
-                            <span className="text-[7px] font-black uppercase tracking-widest text-primary/40 group-hover:text-primary transition-colors">All</span>
-                         </label>
+                <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
+                  <div className="px-4 py-3">
+                     <div className="flex items-center justify-between gap-2">
+                        <div className="flex gap-1.5">
+                         <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={addPage}
+                          className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest border-dashed border hover:border-primary hover:bg-primary/5 rounded-lg transition-all"
+                         >
+                           <Plus className="h-3.5 w-3.5 mr-1 text-primary" /> Paper
+                         </Button>
+                         <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => addSection(currentPageIndex)}
+                          className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest border-dashed border hover:border-primary hover:bg-primary/5 rounded-lg transition-all"
+                         >
+                           <Plus className="h-3.5 w-3.5 mr-1 text-primary" /> Section
+                         </Button>
+                         <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => useAppStore.getState().rebalancePages()} 
+                          className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground/60 hover:text-primary transition-all"
+                          title="Rebalance Pages"
+                         >
+                           <Layers className="h-4 w-4" />
+                         </Button>
+                         <Button 
+                          variant={showBulk ? "outline" : "ghost"} 
+                          size="sm" 
+                          onClick={() => setShowBulk(!showBulk)} 
+                          className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all"
+                         >
+                           {showBulk ? "Close" : "Import"}
+                         </Button>
+                         {pages.length > 1 && (
+                           <DropdownMenu>
+                             <DropdownMenuTrigger asChild>
+                               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-all">
+                                 <Trash2 className="h-4 w-4" />
+                               </Button>
+                             </DropdownMenuTrigger>
+                             <DropdownMenuContent align="start" className="min-w-[140px]">
+                               <DropdownMenuItem onClick={() => {
+                                 const newIndex = Math.max(0, currentPageIndex - 1);
+                                 removePage(currentPageIndex);
+                                 setCurrentPage(newIndex);
+                               }}>
+                                 <Trash2 className="mr-2 h-3.5 w-3.5 text-destructive" />
+                                 <span className="text-xs font-semibold">Delete this page</span>
+                               </DropdownMenuItem>
+                               <DropdownMenuSeparator />
+                               <DropdownMenuItem onClick={() => {
+                                 if (confirm('Delete all pages and start fresh?')) removeAllPages();
+                               }}>
+                                 <Trash2 className="mr-2 h-3.5 w-3.5 text-destructive/60" />
+                                 <span className="text-xs font-semibold">Delete all pages</span>
+                               </DropdownMenuItem>
+                             </DropdownMenuContent>
+                           </DropdownMenu>
+                         )}
                        </div>
-                      <div className="flex gap-1">
-                        <Button 
-                         variant="ghost" 
-                         size="icon" 
-                         onClick={() => useAppStore.getState().rebalancePages()} 
-                         className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-primary transition-all"
-                         title="Rebalance Pages"
-                        >
-                          <Layers className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                         variant={showBulk ? "outline" : "ghost"} 
-                         size="sm" 
-                         onClick={() => setShowBulk(!showBulk)} 
-                         className="h-6 px-2 text-[8px] font-bold uppercase tracking-widest rounded-md transition-all"
-                        >
-                          {showBulk ? "Close" : "Import"}
-                        </Button>
-                      </div>
-                    </div>
-                 </div>
-               </div>
+                     </div>
+                  </div>
+                </div>
 
-             <div className="flex-1 overflow-y-auto p-4 pt-3 pb-16 scrollbar-none scroll-smooth">
+              <div className="overflow-y-auto p-4 pt-3 pb-2 scrollbar-none scroll-smooth">
+
 <AnimatePresence>
-                  {showBulk && (
+                  {(showBulk || isAllBlank) && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.98, y: 10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -656,8 +721,8 @@ const EditorPage = () => {
                       className="bg-muted/10 rounded-xl p-4 border border-border/40 mb-6 overflow-hidden relative"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-[9px] font-bold uppercase flex items-center gap-2 text-primary tracking-widest">
-                          <ClipboardPaste className="h-3 w-3" /> Text Importer
+                        <h3 className="text-xs font-bold uppercase flex items-center gap-2 text-primary tracking-widest">
+                          <ClipboardPaste className="h-4 w-4" /> Text Importer
                         </h3>
                         <Button
                           variant="ghost"
@@ -670,58 +735,63 @@ const EditorPage = () => {
                               toast.error('Unable to read clipboard. Please paste manually.');
                             }
                           }}
-                          className="h-6 px-2 text-[8px] font-black uppercase tracking-wider text-primary/60 hover:text-primary"
+                          className="h-7 px-2 text-[10px] font-bold uppercase text-primary/60 hover:text-primary"
                         >
-                          <ClipboardPaste className="h-2.5 w-2.5 mr-1" /> Paste
+                          <ClipboardPaste className="h-3 w-3 mr-1" /> Paste
                         </Button>
                       </div>
                       <Textarea
                         value={bulkText}
                         onChange={(e) => setBulkText(e.target.value)}
                         placeholder="Paste text here to process across pages..."
-                        className="min-h-[120px] text-xs leading-relaxed bg-white border border-border/20 focus-visible:ring-1 focus-visible:ring-primary/10 rounded-lg p-3 shadow-none"
+                        className="min-h-[120px] text-sm leading-relaxed bg-white border border-border/20 focus-visible:ring-1 focus-visible:ring-primary/10 rounded-lg p-3 shadow-none"
                       />
                       <div className="flex gap-2 mt-3">
-                        <Button onClick={() => { setText(bulkText); setShowBulk(false); }} className="flex-1 h-9 text-[10px] uppercase font-bold tracking-widest rounded-lg">
+                        <Button onClick={() => { setText(bulkText); setShowBulk(false); }} className="flex-1 h-10 text-xs uppercase font-bold tracking-widest rounded-lg">
                           Apply Changes
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setShowBulk(false)} className="h-9 px-3 text-[10px] uppercase font-bold opacity-40">Cancel</Button>
+                        {!isAllBlank && (
+                          <Button variant="ghost" size="sm" onClick={() => setShowBulk(false)} className="h-10 px-3 text-xs uppercase font-bold opacity-40">Cancel</Button>
+                        )}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* Content Editor */}
+                {!isAllBlank && (
+                /* Content Editor */
                 <section className="space-y-3">                   
-                   <div className="bg-white border border-border/40 rounded-xl p-4 hover:shadow-sm transition-all">
-                      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 rounded-lg mb-4 border border-border/10">
+                   <div className="bg-white border border-border/40 rounded-xl p-3 hover:shadow-sm transition-all">
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-lg mb-4 border border-border/10">
                         <Button
                           variant="ghost" size="icon"
                           onClick={() => setCurrentPage(Math.max(0, currentPageIndex - 1))}
                           disabled={currentPageIndex === 0}
-                          className="h-8 w-8 rounded-xl hover:bg-white hover:shadow-sm"
+                          className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-sm"
                         >
                           <ChevronRight className="h-4 w-4 rotate-180 opacity-40" />
                         </Button>
                         <div className="flex flex-col items-center overflow-hidden">
-                          <AnimatePresence mode="popLayout">
-                            <motion.span 
-                              key={currentPageIndex}
-                              initial={{ y: 16, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              exit={{ y: -16, opacity: 0 }}
-                              className="text-[10px] font-black text-foreground tracking-[0.4em] uppercase"
-                            >
-                              Sheet {currentPageIndex + 1}
-                            </motion.span>
-                          </AnimatePresence>
-                          <span className="text-[7px] font-black text-primary uppercase tracking-widest opacity-60">Focusing active paper</span>
+                          <div className="text-xs font-black text-foreground tracking-[0.4em] uppercase flex items-center gap-1">
+                            <span>Sheet</span>
+                            <AnimatePresence mode="popLayout">
+                              <motion.span 
+                                key={currentPageIndex}
+                                initial={{ y: 10, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: -10, opacity: 0 }}
+                              >
+                                {pages[currentPageIndex]?.sections.some(s => s.content?.trim()) ? currentPageIndex + 1 : 0}
+                              </motion.span>
+                            </AnimatePresence>
+                          </div>
+                          <span className="text-[9px] font-black text-primary uppercase tracking-widest opacity-60">Focusing active paper</span>
                         </div>
                         <Button
                           variant="ghost" size="icon"
                           onClick={() => setCurrentPage(Math.min(pages.length - 1, currentPageIndex + 1))}
                           disabled={currentPageIndex === pages.length - 1}
-                          className="h-8 w-8 rounded-xl hover:bg-white hover:shadow-sm"
+                          className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-sm"
                         >
                           <ChevronRight className="h-4 w-4 opacity-40" />
                         </Button>
@@ -739,31 +809,229 @@ const EditorPage = () => {
                             pageIndex={currentPageIndex} 
                             page={pages[currentPageIndex]} 
                           />
-                        </motion.div>
+                         </motion.div>
                       </AnimatePresence>
 
-                      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-muted/60 mt-4">
-                        <Button variant="outline" size="sm" onClick={addPage} className="h-10 gap-2 text-[9px] font-black uppercase tracking-widest border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-all rounded-xl">
-                           <Plus className="h-3.5 w-3.5 text-primary" /> Insert Paper
-                        </Button>
-                        {pages.length > 1 && (
-                          <Button 
-                            variant="ghost" size="sm" 
-                            onClick={() => {
-                              const newIndex = Math.max(0, currentPageIndex - 1);
-                              removePage(currentPageIndex);
-                              setCurrentPage(newIndex);
-                            }} 
-                            className="h-10 text-destructive text-[9px] font-black uppercase tracking-widest hover:bg-destructive/10 rounded-xl"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
-                          </Button>
-                        )}
-                        </div>
-
-                     </div>
+                      </div>
                    </section>
+                   )}
+
                   </div>
+
+                {/* Content Textarea - sticky at bottom */}
+                {pages[currentPageIndex] && (
+                  <div className="bg-white border border-border/40 rounded-xl p-4 shrink-0 border-t-0 rounded-t-none flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                        <FileText className="h-4 w-4" /> Content
+                      </h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (pages[currentPageIndex]?.sections[0]) {
+                            const text = pages[currentPageIndex].sections.map(s => s.content).filter(Boolean).join('\n');
+                            navigator.clipboard.writeText(text);
+                          }
+                        }}
+                        className="h-7 px-2 text-[10px] font-bold uppercase opacity-40 hover:opacity-100 hover:bg-primary/5"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" /> Copy
+                      </Button>
+                    </div>
+
+                    {/* Ink Color */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5 shrink-0">
+                        <Palette className="h-3.5 w-3.5" /> Ink
+                      </span>
+                      <div className="flex gap-2 flex-wrap items-center">
+                        {INK_COLORS.map((color) => (
+                          <button
+                            key={color.id}
+                            onClick={() => setGlobalColor(color.id, applyStyleToAll)}
+                            className={cn(
+                              "w-6 h-6 rounded-full border-2 transition-all flex items-center justify-center relative",
+                              globalColorId === color.id
+                                ? "border-primary scale-110 shadow-md"
+                                : "border-transparent hover:scale-105"
+                            )}
+                            style={{ backgroundColor: color.value }}
+                          >
+                            {globalColorId === color.id && <Check className="h-3 w-3 text-white drop-shadow-md" />}
+                          </button>
+                        ))}
+                        <div className="relative group flex items-center gap-1">
+                          <input
+                            type="color"
+                            value={INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276'}
+                            onChange={(e) => setGlobalColor(e.target.value, applyStyleToAll)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                          />
+                          <div className={cn(
+                            "w-6 h-6 rounded-full border-2 border-dashed flex items-center justify-center transition-all cursor-pointer",
+                            !INK_COLORS.some(c => c.id === globalColorId)
+                              ? "border-primary scale-110 bg-primary/5"
+                              : "border-muted-foreground/30 hover:border-primary/50 group-hover:scale-105"
+                          )}>
+                            <div
+                              className="w-3 h-3 rounded-full shadow-inner"
+                              style={{ backgroundColor: !INK_COLORS.some(c => c.id === globalColorId) ? globalColorId : '#e2e8f0' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Handwritten/Typed + Style selector */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <button
+                        onClick={() => {
+                          const section = pages[currentPageIndex]?.sections[0];
+                          if (!section) return;
+                          const newType = section.type === 'handwritten' ? 'typed' : 'handwritten';
+                          updateSection(currentPageIndex, 0, { type: newType });
+                        }}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+                          pages[currentPageIndex]?.sections[0]?.type === 'handwritten'
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-secondary text-secondary-foreground border-border"
+                        )}
+                      >
+                        {pages[currentPageIndex]?.sections[0]?.type === 'handwritten' ? <PenTool className="h-3.5 w-3.5" /> : <Type className="h-3.5 w-3.5" />}
+                        {pages[currentPageIndex]?.sections[0]?.type === 'handwritten' ? 'Handwritten' : 'Typed'}
+                      </button>
+
+                      {pages[currentPageIndex]?.sections[0]?.type === 'handwritten' && (
+                        <Select
+                          value={pages[currentPageIndex]?.sections[0]?.styleId || ''}
+                          onValueChange={(v) => updateSection(currentPageIndex, 0, { styleId: v })}
+                        >
+                          <SelectTrigger className="w-40 h-8 text-xs rounded-lg">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HANDWRITING_STYLES.map(s => (
+                              <SelectItem key={s.id} value={s.id}>
+                                <span className={cn(s.fontClass, "text-sm")}>{s.name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+
+                    {/* Formatting toolbar */}
+                    <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-muted/50 border mb-3">
+                      {[
+                        { icon: Heading1, label: 'H1', level: 1 },
+                        { icon: Heading2, label: 'H2', level: 2 },
+                        { icon: Heading3, label: 'H3', level: 3 },
+                      ].map(({ icon: Icon, label, level }) => (
+                        <Tooltip key={label}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => {
+                                const section = pages[currentPageIndex]?.sections[0];
+                                if (!section) return;
+                                const isCurrent = section.isHeading && section.headingLevel === level;
+                                updateSection(currentPageIndex, 0, { isHeading: !isCurrent, headingLevel: isCurrent ? undefined : level });
+                              }}
+                              className={cn(
+                                "p-1.5 rounded-md transition-colors",
+                                pages[currentPageIndex]?.sections[0]?.isHeading && pages[currentPageIndex]?.sections[0]?.headingLevel === level
+                                  ? "bg-primary text-primary-foreground"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">{label}</TooltipContent>
+                        </Tooltip>
+                      ))}
+                      <div className="w-px h-5 bg-border mx-1" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => updateSection(currentPageIndex, 0, { isHeading: false, headingLevel: undefined })}
+                            className={cn(
+                              "p-1.5 rounded-md transition-colors",
+                              !pages[currentPageIndex]?.sections[0]?.isHeading
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                            )}
+                          >
+                            <Type className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">Normal</TooltipContent>
+                      </Tooltip>
+                      <div className="w-px h-5 bg-border mx-1" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => {
+                              const section = pages[currentPageIndex]?.sections[0];
+                              if (!section) return;
+                              updateSection(currentPageIndex, 0, { content: section.content + '\n• ' });
+                            }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <List className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">Bullet</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => {
+                              const section = pages[currentPageIndex]?.sections[0];
+                              if (!section) return;
+                              updateSection(currentPageIndex, 0, { content: section.content + '\n1. ' });
+                            }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <ListOrdered className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">Numbered</TooltipContent>
+                      </Tooltip>
+                      <div className="w-px h-5 bg-border mx-1" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => contentFileInputRef.current?.click()}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">Image</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => contentDiagramInputRef.current?.click()}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            <Move className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">Diagram</TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    <textarea
+                      value={pages[currentPageIndex]?.sections[0]?.content || ''}
+                      onChange={(e) => updateSection(currentPageIndex, 0, { content: e.target.value })}
+                      placeholder="Write your text here..."
+                      className="w-full flex-1 min-h-0 bg-background p-3 text-sm font-body text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 ring-1 ring-border/40 transition-all border border-border/40"
+                    />
+                  </div>
+                )}
 
                             </div>
 
@@ -785,54 +1053,57 @@ const EditorPage = () => {
                 )}
               </AnimatePresence>
 
-{/* SIMPLIFIED PAGE NAVIGATION (CLEAN SIDEBAR) */}
-             <div className="w-10 md:w-14 lg:w-16 border-r border-border/40 bg-white flex flex-col items-center py-4 md:py-5 gap-3 md:gap-3.5 shrink-0 overflow-y-auto no-scrollbar z-30">
-                {pages.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => scrollToPage(i)}
-                    className={cn(
-                      "w-9 h-14 md:w-12 md:h-16 lg:w-14 lg:h-20 rounded-lg md:rounded-xl transition-all duration-300 flex flex-col items-center justify-center gap-0.5 md:gap-1 border relative group shrink-0",
-                      i === currentPageIndex 
-                      ? "bg-white border-primary shadow-md ring-2 ring-primary/10" 
-                      : "bg-muted/10 border-transparent hover:bg-muted/30 opacity-50 hover:opacity-100"
-                    )}
-                  >
-                     <div className={cn("w-3.5 h-0.5 md:w-5 md:h-0.5 rounded-full transition-colors", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
-                     <div className={cn("w-2.5 h-0.5 md:w-3.5 md:h-0.5 rounded-full transition-colors opacity-40 hidden md:block", i === currentPageIndex ? "bg-primary" : "bg-foreground/20")} />
-                     <span className={cn("text-[9px] md:text-[10px] font-bold transition-colors mt-0.5 md:mt-1", i === currentPageIndex ? "text-primary" : "text-muted-foreground")}>{i + 1}</span>
-                  </button>
-                ))}
-                
-                <button 
-                  onClick={addPage} 
-                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border-border/8 border-dashed border-2 flex items-center justify-center hover:bg-muted/20 hover:border-primary transition-all opacity-40 hover:opacity-100"
-                >
-                   <Plus className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                </button>
-             </div>
- 
-             {/* MAIN SCROLL AREA: CLEAN & FOCUSED */}
-             <div
-               ref={scrollContainerRef}
-               className="flex-1 overflow-y-auto px-3 md:px-6 py-6 md:py-10 bg-[#f4f4f7] scroll-smooth no-scrollbar"
-             >
+ {/* MAIN SCROLL AREA: CLEAN & FOCUSED */}
+             <div className="flex-1 flex flex-col min-w-0 bg-[#f4f4f7]">
+               {/* Page Strip - inside content frame */}
+               <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border/40 bg-white overflow-x-auto no-scrollbar z-30">
+                 {pages.map((_, i) => (
+                   <button
+                     key={i}
+                     onClick={() => scrollToPage(i)}
+                     className={cn(
+                       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 shrink-0 border text-xs font-semibold",
+                       i === currentPageIndex
+                         ? "bg-white border-primary shadow-md ring-1 ring-primary/10 text-primary"
+                         : "bg-muted/10 border-transparent hover:bg-muted/30 text-muted-foreground hover:text-foreground"
+                     )}
+                   >
+                     <span className="font-bold">Sheet {i + 1}</span>
+                     {i === currentPageIndex && <span className="text-[9px] opacity-60">· Focusing</span>}
+                   </button>
+                 ))}
+                 <button
+                   onClick={addPage}
+                   className="shrink-0 w-7 h-7 rounded-lg border-border/8 border-dashed border-2 flex items-center justify-center hover:bg-muted/20 hover:border-primary transition-all opacity-40 hover:opacity-100"
+                 >
+                   <Plus className="h-3 w-3" />
+                 </button>
+               </div>
+
+               <div
+                 ref={scrollContainerRef}
+                 className="flex-1 overflow-y-auto px-3 md:px-6 py-6 md:py-10 no-scrollbar"
+                 style={{ scrollBehavior: 'auto', willChange: 'scroll-position' }}
+               >
                 <div className="flex flex-col items-center gap-10 md:gap-14 w-full mx-auto pb-[30vh]">
                    {pages.map((page, i) => {
                       const size = PAGE_SIZES.find(s => s.id === page.sizeId) || PAGE_SIZES[0];
                       const displayWidth = size.width * 2.5 * zoomScale;
                       const displayHeight = size.height * 2.5 * zoomScale;
+                      const isCurrent = i === currentPageIndex;
                       
-                      return (
-                        <motion.div
+                       return (
+                        <div
                           key={page.id}
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5 }}
                           className={cn(
-                            "relative transition-all duration-500 group/page",
-                            i === currentPageIndex ? "z-10" : "z-0 opacity-60 hover:opacity-90"
+                            "relative group/page",
+                            isCurrent ? "z-10" : "z-0"
                           )}
+                          style={{ 
+                            contentVisibility: 'auto', 
+                            containIntrinsicSize: `${displayWidth}px ${displayHeight}px`,
+                            willChange: 'transform',
+                          }}
                           onClick={() => setCurrentPage(i)}
                         >
                            {/* CLEAN PAGE SHADOW & WRAPPER */}
@@ -844,10 +1115,15 @@ const EditorPage = () => {
                                  ref={(el) => { if (el) pageRefs.current[i] = el; }}
                                  className={cn(
                                   "bg-white ring-1 ring-border/10 absolute top-0 left-0",
-                                  i === currentPageIndex 
+                                  isCurrent 
                                   ? "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1),0_0_1px_rgba(0,0,0,0.1)] z-20" 
                                   : "shadow-sm"
                                 )}
+                                style={{ 
+                                  width: size.width * 2.5 * zoomScale,
+                                  height: size.height * 2.5 * zoomScale,
+                                  contain: 'layout style',
+                                }}
                                 style={{ 
                                   width: size.width * 2.5 * zoomScale,
                                   height: size.height * 2.5 * zoomScale
@@ -873,7 +1149,7 @@ const EditorPage = () => {
                                      }
                                    }}
                                  />
-                             </div>
+                         </div>
                            </div>
 
                          {/* SUBTLE PAGE INDICATOR */}
@@ -888,12 +1164,13 @@ const EditorPage = () => {
                               Page {i + 1}
                             </span>
                          </div>
-                      </motion.div>
+                      </div>
                    );
                    })}
                 </div>
              </div>
-           </div> {/* Added missing closing div for the center preview section */}
+           </div>
+           </div> {/* center preview section */}
 
            {/* RIGHT PANEL: EDITOR SETTINGS */}
            <div className={cn(
@@ -1026,6 +1303,44 @@ const EditorPage = () => {
                    </div>
                  </div>
               </div>
+
+              {/* Hidden file inputs for content box */}
+              <input
+                ref={contentFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !pages[currentPageIndex]) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    updateSection(currentPageIndex, 0, { imageUrl: reader.result as string });
+                  };
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={contentDiagramInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !pages[currentPageIndex]) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const section = pages[currentPageIndex]?.sections[0];
+                    const existing = section?.images || [];
+                    const newImg = { url: reader.result as string, x: 10, y: 10, width: 200, height: 150 };
+                    updateSection(currentPageIndex, 0, { images: [...existing, newImg] });
+                  };
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+
              {/* Hidden Capture Area */}
           <div className="fixed -left-[8000px] top-0 pointer-events-none opacity-0">
               {pages.map((page, i) => (

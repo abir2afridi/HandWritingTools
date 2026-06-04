@@ -1,5 +1,4 @@
 import React, { memo, forwardRef } from 'react';
-import { motion } from 'framer-motion';
 import { PageConfig, HANDWRITING_STYLES, INK_COLORS, PAGE_LAYOUTS, PAGE_SIZES } from '@/lib/handwriting/types';
 import { HandwritingRenderer } from './HandwritingRenderer';
 import { cn } from '@/lib/utils';
@@ -32,7 +31,7 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
       <div
         ref={ref}
         className={cn(
-          "shadow-xl relative overflow-hidden rounded-sm",
+          "relative overflow-hidden rounded-sm",
           !isCustom && layout.paperClass,
           showMargin && "paper-margin"
         )}
@@ -45,6 +44,7 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
           paddingRight: `${margins.right * 2.5 * scale}px`,
           fontSize: `${14 * scale}px`,
           lineHeight: `${32 * scale}px`,
+          contain: 'layout style',
         }}
       >
         {isCustom && bgImage && (
@@ -79,40 +79,54 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
                 </div>
               )}
 
-              {/* Positionable Diagrams - NOW DRAGGABLE */}
-              {section.images?.map((img, imgIdx) => (
-                <motion.div
-                  key={`${section.id}-${imgIdx}`}
-                  drag
-                  dragMomentum={false}
-                   onDragEnd={(_, info) => {
-                    if (onImageUpdate) {
-                       // Convert drag offset correctly based on the current scale
-                       onImageUpdate(section.id, imgIdx, {
-                         x: img.x + (info.offset.x / scale),
-                         y: img.y + (info.offset.y / scale)
-                       });
-                    }
-                  }}
-                  className="absolute cursor-move active:cursor-grabbing hover:ring-2 hover:ring-primary/40 rounded-sm transition-shadow group"
-                  style={{
-                    left: img.x * scale,
-                    top: img.y * scale,
-                    width: img.width * scale,
-                    height: img.height * scale,
-                    zIndex: 50,
-                  }}
-                >
-                  <img
-                    src={img.url}
-                    alt={`Diagram ${imgIdx + 1}`}
-                    className="w-full h-full object-contain pointer-events-none"
-                  />
-                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap font-bold">
-                    Drag to move
+              {/* Positionable Diagrams - DRAGGABLE */}
+              {section.images?.map((img, imgIdx) => {
+                let startX = 0, startY = 0;
+                return (
+                  <div
+                    key={`${section.id}-${imgIdx}`}
+                    className="absolute cursor-move active:cursor-grabbing hover:ring-2 hover:ring-primary/40 rounded-sm transition-shadow group"
+                    style={{
+                      left: img.x * scale,
+                      top: img.y * scale,
+                      width: img.width * scale,
+                      height: img.height * scale,
+                      zIndex: 50,
+                    }}
+                    onMouseDown={(e) => {
+                      startX = e.clientX;
+                      startY = e.clientY;
+                      const onMove = (ev: MouseEvent) => {
+                        const dx = ev.clientX - startX;
+                        const dy = ev.clientY - startY;
+                        (e.target as HTMLElement).style.left = `${img.x * scale + dx}px`;
+                        (e.target as HTMLElement).style.top = `${img.y * scale + dy}px`;
+                      };
+                      const onUp = (ev: MouseEvent) => {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                        if (onImageUpdate) {
+                          onImageUpdate(section.id, imgIdx, {
+                            x: img.x + (ev.clientX - startX) / scale,
+                            y: img.y + (ev.clientY - startY) / scale,
+                          });
+                        }
+                      };
+                      document.addEventListener('mousemove', onMove);
+                      document.addEventListener('mouseup', onUp);
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt={`Diagram ${imgIdx + 1}`}
+                      className="w-full h-full object-contain pointer-events-none"
+                    />
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap font-bold">
+                      Drag to move
+                    </div>
                   </div>
-                </motion.div>
-              ))}
+                );
+              })}
 
               {section.type === 'typed' ? (
                 <div

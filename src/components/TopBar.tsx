@@ -2,9 +2,34 @@ import { motion } from 'framer-motion';
 import { Search, Bell, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+
+function useLiveClock() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const h12 = now.getHours() % 12 || 12;
+  const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+
+  const dateStr = now.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return { h12, mm, ss, ampm, dateStr };
+}
 
 export default function TopBar() {
   const navigate = useNavigate();
+  const { h12, mm, ss, ampm, dateStr } = useLiveClock();
 
   return (
     <motion.header
@@ -24,7 +49,17 @@ export default function TopBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        {/* Live Clock */}
+        <div className="flex items-center gap-1 text-sm font-mono select-none">
+          <span className="font-semibold text-foreground">{h12}:{mm}</span>
+          <span className="font-bold text-red-500">{ss}</span>
+          <span className="text-xs font-semibold text-muted-foreground ml-0.5">{ampm}</span>
+          <span className="text-xs text-muted-foreground/60 ml-2 hidden sm:inline">{dateStr}</span>
+        </div>
+
+        <div className="h-4 w-[1px] bg-border" />
+
         <Button variant="ghost" size="icon" className="text-muted-foreground">
           <Bell className="w-4 h-4" />
         </Button>

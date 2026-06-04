@@ -61,6 +61,7 @@ interface AppState {
   updatePage: (index: number, page: Partial<PageConfig>) => void;
   addPage: () => void;
   removePage: (index: number) => void;
+  removeAllPages: () => void;
   updateSection: (pageIndex: number, sectionIndex: number, section: Partial<TextSection>) => void;
   addSection: (pageIndex: number) => void;
   removeSection: (pageIndex: number, sectionIndex: number) => void;
@@ -449,6 +450,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (state.pages.length <= 1) return state;
       const pages = state.pages.filter((_, i) => i !== index).map((p, i) => ({ ...p, pageNumber: i + 1 }));
       return { pages, currentPageIndex: Math.min(state.currentPageIndex, pages.length - 1) };
+    });
+  },
+
+  removeAllPages: () => {
+    get().saveHistory();
+    set((state) => {
+      const page = createDefaultPage(1, state.globalStyleId, state.globalColorId, state.globalSizeId, state.globalLayoutId, state.globalMargins);
+      return { pages: [page], currentPageIndex: 0 };
     });
   },
 

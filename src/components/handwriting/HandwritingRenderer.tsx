@@ -40,7 +40,7 @@ export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge }: Ha
   const getLineDrift = (lineIdx: number) => (hash(0, lineIdx, seed + 99) - 0.5) * 1.5 * scale;
 
   return (
-    <div className={cn(inkSmudge && "ink-smudge")} style={{ position: 'relative' }}>
+    <div className={cn(inkSmudge && "ink-smudge")} style={{ position: 'relative', contain: 'layout style' }}>
       {/* Positionable diagrams */}
       {section.images && section.images.map((img, imgIdx) => (
         <img
