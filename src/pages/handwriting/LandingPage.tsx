@@ -54,15 +54,22 @@ const Landing = () => {
             transition={{ duration: 0.7 }}
             className="max-w-3xl mx-auto"
           >
-            <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-foreground mb-6 leading-[1.1] tracking-tight">
-              Turn Your Text Into{' '}
+            <h1 className="font-qwigley text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-foreground mb-6 leading-[1.1]">
+              Turn Your Text Into<br />
               <span className="text-primary relative">
                 Realistic Handwriting
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: '100%' }}
-                  transition={{ delay: 0.8, duration: 1, ease: 'easeOut' }}
-                  className="absolute -bottom-1 left-0 h-1 bg-accent/60 rounded-full"
+                  transition={{ delay: 0.8, duration: 0.8, ease: 'easeOut' }}
+                  className="absolute -bottom-2 left-0 h-[3.5px]"
+                  style={{
+                    background: 'linear-gradient(90deg, rgba(100,60,200,0.9) 0%, rgba(130,80,220,0.7) 30%, rgba(100,60,200,0.5) 60%, rgba(140,90,230,0.8) 80%, rgba(100,60,200,0.6) 100%)',
+                    borderRadius: '3px 1px 2px 1px',
+                    filter: 'blur(0.4px)',
+                    transform: 'rotate(-0.3deg) scaleY(0.9)',
+                    boxShadow: '0 0 2px rgba(100,60,200,0.15), 1px 0 3px rgba(100,60,200,0.1)',
+                  }}
                 />
               </span>
             </h1>

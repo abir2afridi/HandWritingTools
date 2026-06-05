@@ -20,6 +20,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Inter', 'system-ui', 'sans-serif'],
         content: ['Lora', 'Georgia', 'serif'],
+        qwigley: ['Qwigley', 'cursive'],
       },
       colors: {
         border: "hsl(var(--border))",

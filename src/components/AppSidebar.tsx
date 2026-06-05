@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Home, PenTool as WriterIcon, ChevronLeft, PanelLeft, Info } from 'lucide-react';
+import { Home, PenTool as WriterIcon, ChevronLeft, PanelLeft, Info } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -37,20 +37,18 @@ export default function AppSidebar({ className, hideMobileButton }: { className?
       {/* Logo */}
       <div className="p-4 border-b border-border flex items-center shrink-0 h-[73px]">
         <div className="flex items-center gap-2 overflow-hidden w-full">
-          <div className="w-9 h-9 shrink-0 rounded-lg bg-hero-gradient flex items-center justify-center">
-            <Sparkles className="w-4.5 h-4.5 text-primary-foreground" />
-          </div>
+          <img src="https://img.icons8.com/?size=120&id=bqkw0UxbroZv&format=png" alt="" className="w-9 h-9 shrink-0" />
           {!isMobile && (
             <motion.span
               animate={{ opacity: isExpanded ? 1 : 0 }}
-              className="font-display font-bold text-lg text-foreground whitespace-nowrap"
+              className="font-display font-bold text-sm text-foreground truncate"
             >
-              DeckAI
+              Text to Handwriting
             </motion.span>
           )}
           {isMobile && (
-            <span className="font-display font-bold text-lg text-foreground whitespace-nowrap flex-1">
-              DeckAI
+            <span className="font-display font-bold text-sm text-foreground truncate flex-1">
+              Text to Handwriting
             </span>
           )}
         </div>
