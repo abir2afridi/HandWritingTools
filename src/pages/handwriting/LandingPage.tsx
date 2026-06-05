@@ -40,7 +40,7 @@ const Landing = () => {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src={heroImage} alt="" className="w-full h-full object-cover opacity-15 dark:opacity-10" />
+          <img src={heroImage} alt="" className="w-full h-full object-cover opacity-30 dark:opacity-25" />
           <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
         </div>
         {/* Decorative blobs */}
@@ -54,15 +54,6 @@ const Landing = () => {
             transition={{ duration: 0.7 }}
             className="max-w-3xl mx-auto"
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20 backdrop-blur-sm"
-            >
-              <Zap className="h-4 w-4" />
-              AI-Powered Handwriting Generator
-            </motion.div>
             <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-foreground mb-6 leading-[1.1] tracking-tight">
               Turn Your Text Into{' '}
               <span className="text-primary relative">
