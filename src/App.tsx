@@ -14,6 +14,7 @@ import Share from "./pages/Share.tsx";
 // Handwriting Features
 import HandwritingLanding from "./pages/handwriting/LandingPage.tsx";
 import HandwritingEditor from "./pages/handwriting/EditorPage.tsx";
+import About from "./pages/About.tsx";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
 
           {/* Handwriting Flow Routes - Consolidated into EditorPage */}
           <Route path="/editor-handwriting" element={<HandwritingEditor />} />
+          <Route path="/about" element={<About />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

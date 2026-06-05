@@ -3,6 +3,7 @@ import { Search, Bell, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { ThemeToggle } from '@/components/handwriting/ThemeToggle';
 
 function useLiveClock() {
   const [now, setNow] = useState(new Date());
@@ -63,6 +64,7 @@ export default function TopBar() {
         <Button variant="ghost" size="icon" className="text-muted-foreground">
           <Bell className="w-4 h-4" />
         </Button>
+        <ThemeToggle />
         <Button variant="hero" size="sm" onClick={() => navigate('/create')} className="gap-1.5">
           <Plus className="w-4 h-4" />
           New Deck

@@ -35,7 +35,7 @@ export function HandwritingStyleTab({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0 px-6 pt-4 pb-3 border-b border-border/10 bg-[#fafafa] space-y-3">
+      <div className="shrink-0 px-6 pt-4 pb-3 border-b border-border/10 bg-muted/30 space-y-3">
         <h3 className="font-display text-lg text-foreground leading-none">Handwriting Style</h3>
         <div className="flex gap-2">
           <div className="relative flex-1">

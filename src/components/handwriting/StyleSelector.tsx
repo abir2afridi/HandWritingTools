@@ -48,7 +48,7 @@ export function StyleSelector({ selectedStyleId, selectedColorId, onStyleChange,
                 {String(idx + 1).padStart(2, '0')}
               </span>
               <div className="flex items-center justify-between w-full mb-1 pl-5">
-                <span className="text-sm font-medium text-foreground">{style.name}</span>
+                <span className={cn(style.fontClass, "text-sm text-foreground")}>{style.name}</span>
                 <div className="flex items-center gap-1.5">
                   <span className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-full",

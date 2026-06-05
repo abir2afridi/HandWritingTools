@@ -56,6 +56,7 @@ export function LayoutSelector({
         <div className="grid grid-cols-2 gap-4">
           {PAGE_LAYOUTS.map((layout, idx) => {
             const isCustom = layout.id === 'custom';
+            const displayNum = isCustom ? null : idx; // custom has no number, rest start from 1
             return (
               <button
                 key={layout.id}
@@ -68,15 +69,17 @@ export function LayoutSelector({
                 )}
               >
                 <span className="absolute top-2 left-2 text-[9px] font-black text-muted-foreground/20 tabular-nums">
-                  {String(idx + 1).padStart(2, '0')}
+                  {displayNum !== null ? String(displayNum).padStart(2, '0') : ''}
                 </span>
                 <div className={cn(
                   "w-full aspect-[4/3] rounded-lg mb-3 shadow-inner border border-black/5 flex items-center justify-center overflow-hidden",
                   isCustom ? 'bg-muted/40' : '',
-                  (!isCustom && (layout.paperClass.includes('bg-') || ['aged', 'blueprint', 'legal-pad', 'dark-grid', 'blackboard', 'parchment', 'realistic-white'].includes(layout.id))) ? '' : 'bg-paper-white',
-                  !isCustom && layout.paperClass
+                  (!isCustom && (layout.paperClass.includes('bg-') || ['aged', 'blueprint', 'legal-pad', 'dark-grid', 'blackboard', 'parchment', 'realistic-white', 'paper-1', 'paper-2', 'paper-3', 'paper-4'].includes(layout.id))) ? '' : 'bg-paper-white',
+                  !isCustom && !layout.paperImage && layout.paperClass
                 )}>
-                  {isCustom ? (
+                  {layout.paperImage ? (
+                    <img src={layout.paperImage} alt={layout.name} className="w-full h-full object-cover" />
+                  ) : isCustom ? (
                     customPaperUrl ? (
                       <img src={customPaperUrl} alt="Custom paper" className="w-full h-full object-cover" />
                     ) : (

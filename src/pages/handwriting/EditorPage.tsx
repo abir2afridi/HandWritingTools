@@ -3,6 +3,7 @@ import { SectionEditor } from '@/components/handwriting/SectionEditor';
 import { PagePreview } from '@/components/handwriting/PagePreview';
 import { HandwritingStyleTab } from '@/components/handwriting/HandwritingStyleTab';
 import { PaperStyleTab } from '@/components/handwriting/PaperStyleTab';
+import { ThemeToggle } from '@/components/handwriting/ThemeToggle';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAppStore } from '@/lib/handwriting/store';
 import { HANDWRITING_STYLES, INK_COLORS } from '@/lib/handwriting/types';
@@ -38,6 +39,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 import { PAGE_SIZES } from '@/lib/handwriting/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -46,7 +48,7 @@ const EditorPage = () => {
   const { 
     pages, currentPageIndex, setCurrentPage, addPage, removePage, removeAllPages, addSection, 
     setText, showMargin, setShowMargin, showPageNumbers, setShowPageNumbers, 
-    inkSmudge, setInkSmudge, setGlobalStyle, setGlobalColor, setGlobalSize, setGlobalLayout,
+    inkSmudge, setInkSmudge, setGlobalStyle, setGlobalColor, setGlobalColorLive, setGlobalSize, setGlobalLayout,
     globalStyleId, globalColorId, globalSizeId, globalLayoutId,
     globalMargins, setGlobalMargins,
     customPaperUrl, setCustomPaperUrl,
@@ -69,6 +71,9 @@ const EditorPage = () => {
     if (isAllBlank) setShowBulk(true);
   }, [isAllBlank]);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [showImageExport, setShowImageExport] = useState(false);
+  const [showPdfExport, setShowPdfExport] = useState(false);
+  const [selectedExportPages, setSelectedExportPages] = useState<Set<number>>(new Set());
   const [zoomScale, setZoomScale] = useState(0.8);
   const [noteTitle, setNoteTitle] = useState('Untitled Note');
   const [isSaved, setIsSaved] = useState(true);
@@ -78,6 +83,8 @@ const EditorPage = () => {
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const customColorRafRef = useRef<number>(0);
+  const customColorRef = useRef<string | null>(null);
   const [fontSearchOpen, setFontSearchOpen] = useState(false);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const contentFileInputRef = useRef<HTMLInputElement>(null);
@@ -186,39 +193,68 @@ const EditorPage = () => {
     return canvases;
   };
 
-  const exportAsPDF = async () => {
+  const exportAsPDF = async (pageIndices?: number[]) => {
     setExporting('pdf');
     try {
-      const size = PAGE_SIZES.find(s => s.id === pages[0].sizeId) || PAGE_SIZES[0];
+      const indices = pageIndices && pageIndices.length > 0 ? pageIndices : pages.map((_, i) => i);
+      const firstPage = pages[indices[0]];
+      const size = PAGE_SIZES.find(s => s.id === firstPage.sizeId) || PAGE_SIZES[0];
       const pdf = new jsPDF({
         orientation: size.width > size.height ? 'landscape' : 'portrait',
         unit: 'mm',
         format: [size.width, size.height],
       });
-      const canvases = await capturePages();
-      canvases.forEach((canvas, i) => {
-        if (i > 0) pdf.addPage([size.width, size.height]);
+      for (const i of indices) {
+        const el = pageRefs.current[i];
+        if (!el) continue;
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null });
+        if (i !== indices[0]) pdf.addPage([size.width, size.height]);
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, size.width, size.height);
-      });
+      }
       pdf.save('assignment.pdf');
       toast.success('PDF exported!');
     } catch (e) { toast.error('Export failed.'); }
     setExporting(null);
+    setShowPdfExport(false);
+    setSelectedExportPages(new Set());
   };
 
-  const exportAsImages = async () => {
+  const exportAsImages = async (pageIndices?: number[]) => {
     setExporting('png');
     try {
-      const canvases = await capturePages();
-      canvases.forEach((canvas, i) => {
+      const indices = pageIndices && pageIndices.length > 0 ? pageIndices : pages.map((_, i) => i);
+      const canvases: { index: number; canvas: HTMLCanvasElement }[] = [];
+      for (const i of indices) {
+        const el = pageRefs.current[i];
+        if (!el) continue;
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null });
+        canvases.push({ index: i, canvas });
+      }
+
+      if (canvases.length === 1) {
         const link = document.createElement('a');
-        link.download = `page-${i + 1}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.download = `page-${canvases[0].index + 1}.png`;
+        link.href = canvases[0].canvas.toDataURL('image/png');
         link.click();
-      });
-      toast.success('Images exported!');
+      } else if (canvases.length > 1) {
+        const zip = new JSZip();
+        canvases.forEach(({ index, canvas }) => {
+          const dataUrl = canvas.toDataURL('image/png');
+          const base64 = dataUrl.split(',')[1];
+          zip.file(`page-${index + 1}.png`, base64, { base64: true });
+        });
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.download = 'assignment-images.zip';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+      toast.success(canvases.length === 1 ? 'Image exported!' : `${canvases.length} images exported as ZIP!`);
     } catch (e) { toast.error('Export failed.'); }
     setExporting(null);
+    setShowImageExport(false);
+    setSelectedExportPages(new Set());
   };
 
   // Memoize current page to reduce re-renders  
@@ -241,10 +277,10 @@ const EditorPage = () => {
 
   if (!activeNoteId) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[#f8fafc] w-full fixed inset-0">
+      <div className="flex h-screen overflow-hidden bg-background w-full fixed inset-0">
         <AppSidebar className="shrink-0 h-screen sticky top-0" />
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-          <header className="h-16 px-10 border-b border-border/40 bg-white flex items-center justify-between shrink-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <header className="h-16 px-10 border-b border-border/40 bg-background flex items-center justify-between shrink-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center border border-primary/10">
                 <PenTool className="h-5 w-5 text-primary" />
@@ -284,10 +320,11 @@ const EditorPage = () => {
               </div>
             </div>
              <div className="flex items-center gap-4">
+               <ThemeToggle />
                <div className="flex items-center -space-x-2 mr-4 opacity-40 hover:opacity-100 transition-all">
-                  <div className="w-6 h-6 rounded-full border-2 border-white bg-[#1a5276]" />
-                  <div className="w-6 h-6 rounded-full border-2 border-white bg-[#7b241c]" />
-                  <div className="w-6 h-6 rounded-full border-2 border-white bg-[#145a32]" />
+                  <div className="w-6 h-6 rounded-full border-2 border-background bg-[#1a5276]" />
+                  <div className="w-6 h-6 rounded-full border-2 border-background bg-[#7b241c]" />
+                  <div className="w-6 h-6 rounded-full border-2 border-background bg-[#145a32]" />
                </div>
                <Button onClick={() => setIsSelectingSize(true)} className="gap-2 h-10 px-6 rounded-xl bg-primary text-white hover:bg-primary/90 transition-all uppercase text-[10px] font-black tracking-widest shadow-lg shadow-primary/20">
                  <Plus className="h-4 w-4" />
@@ -298,7 +335,7 @@ const EditorPage = () => {
 
           <main className="flex-1 overflow-y-auto p-12 relative">
              {/* Suble background decoration */}
-             <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.4] pointer-events-none" />
+             <div className="absolute inset-0 bg-[radial-gradient(var(--border)_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.4] pointer-events-none" />
              
              <div className="max-w-7xl mx-auto w-full relative z-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -324,7 +361,7 @@ const EditorPage = () => {
                   >
                     <div 
                       onClick={() => loadNote(note.id)}
-                      className="aspect-[3/4] rounded-xl bg-white border border-border/40 overflow-hidden cursor-pointer hover:border-primary/20 hover:shadow-sm transition-all p-6 flex flex-col"
+                      className="aspect-[3/4] rounded-xl bg-card border border-border/40 overflow-hidden cursor-pointer hover:border-primary/20 hover:shadow-sm transition-all p-6 flex flex-col"
                     >
                         <div className="flex-1 flex flex-col gap-2.5 opacity-5 group-hover:opacity-10 transition-opacity">
                            <div className="h-[2px] w-full bg-foreground rounded-full" />
@@ -349,7 +386,7 @@ const EditorPage = () => {
                       variant="ghost" 
                       size="icon" 
                       onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
-                      className="absolute top-3 right-3 h-7 w-7 rounded-lg bg-white/80 border border-border shadow-sm opacity-0 group-hover:opacity-100 transition-all text-destructive hover:bg-destructive hover:text-white"
+                      className="absolute top-3 right-3 h-7 w-7 rounded-lg bg-background/80 border border-border shadow-sm opacity-0 group-hover:opacity-100 transition-all text-destructive hover:bg-destructive hover:text-white"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -375,7 +412,7 @@ const EditorPage = () => {
         {/* PAPER SIZE SELECTION DIALOG */}
         <Dialog open={isSelectingSize} onOpenChange={setIsSelectingSize}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-transparent shadow-none max-h-[95vh]">
-            <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl p-10 border border-border shadow-2xl relative overflow-y-auto max-h-[95vh] custom-scrollbar">
+            <div className="w-full bg-background/95 backdrop-blur-xl rounded-2xl p-10 border border-border shadow-2xl relative overflow-y-auto max-h-[95vh] custom-scrollbar">
               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
                 <Maximize className="h-64 w-64 text-primary" />
               </div>
@@ -402,7 +439,7 @@ const EditorPage = () => {
                         createNote(size.id, `Assignment ${notes.length + 1}`);
                         setIsSelectingSize(false);
                       }}
-                      className="group aspect-[3/4] bg-white rounded-xl border border-border p-5 flex flex-col items-center justify-center relative hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer box-border"
+                      className="group aspect-[3/4] bg-card rounded-xl border border-border p-5 flex flex-col items-center justify-center relative hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer box-border"
                     >
                       <div className="relative w-full h-full border border-dashed border-muted/30 rounded-lg group-hover:border-primary/20 transition-all flex flex-col items-center justify-center bg-muted/5">
                         <span className="text-sm font-black text-muted-foreground group-hover:text-primary transition-all mb-1">{size.id.toUpperCase()}</span>
@@ -434,12 +471,12 @@ const EditorPage = () => {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen overflow-hidden bg-[#f8fafc] w-full fixed inset-0 selection:bg-primary/10">
+      <div className="flex h-screen overflow-hidden bg-background w-full fixed inset-0 selection:bg-primary/10">
       <AppSidebar className="shrink-0 h-screen sticky top-0" />
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         
         {/* ENHANCED TOP BAR */}
-        <header className="h-14 border-b border-border/40 bg-white/80 backdrop-blur-md px-3 md:px-6 flex items-center justify-between shrink-0 z-50">
+        <header className="h-14 border-b border-border/40 bg-background/80 backdrop-blur-md px-3 md:px-6 flex items-center justify-between shrink-0 z-50">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-4">
                <Button 
@@ -475,7 +512,7 @@ const EditorPage = () => {
               <div className="h-4 w-[1px] bg-border/40" />
 
               {/* HISTORY ACTIONS - PREMIUM */}
-              <div className="flex items-center gap-1.5 bg-white border border-border/40 px-2 py-1.5 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center gap-1.5 bg-background border border-border/40 px-2 py-1.5 rounded-xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                 <Tooltip>
                   <TooltipTrigger asChild>                    <Button
                       variant="ghost"
@@ -529,13 +566,13 @@ const EditorPage = () => {
 
                  <div className="h-4 w-[1px] bg-border/40" />
                  
-                 <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-lg border border-border/20">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <ZoomOut className="h-3 w-3 opacity-30 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => handleManualZoom(Math.max(0.3, zoomScale - 0.1))} />
-                      </TooltipTrigger>
-                      <TooltipContent className="text-[10px] font-bold">Zoom Out</TooltipContent>
-                    </Tooltip>
+                  <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-lg border border-border/20">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <ZoomOut className="h-3 w-3 opacity-30 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => handleManualZoom(Math.max(0.3, zoomScale - 0.1))} />
+                       </TooltipTrigger>
+                       <TooltipContent className="text-[10px] font-bold">Zoom Out</TooltipContent>
+                     </Tooltip>
                    <Slider
                      value={[zoomScale]}
                      onValueChange={handleManualZoom}
@@ -544,6 +581,7 @@ const EditorPage = () => {
                      step={0.01}
                      className="w-24 h-4 cursor-pointer"
                    />
+                     <span className="text-[10px] font-bold text-muted-foreground/80 w-10 tabular-nums">{Math.round(zoomScale * 100)}%</span>
                      <Tooltip>
                       <TooltipTrigger asChild>
                          <ZoomIn className="h-3 w-3 opacity-30 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => handleManualZoom(Math.min(1.5, zoomScale + 0.1))} />
@@ -560,8 +598,6 @@ const EditorPage = () => {
                     >
                        Reset 100%
                     </button>
-                    <div className="h-3 w-[1px] bg-border/40 mx-1" />
-                    <span className="text-[10px] font-bold text-muted-foreground/80 w-10 tabular-nums">{Math.round(zoomScale * 100)}%</span>
                  </div>
              </div>
           </div>
@@ -600,6 +636,7 @@ const EditorPage = () => {
             )}
 
             {/* Single Export Dropdown */}
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -614,11 +651,11 @@ const EditorPage = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={exportAsPDF} disabled={!!exporting}>
+                <DropdownMenuItem onClick={() => { setSelectedExportPages(new Set(pages.map((_, i) => i))); setShowPdfExport(true); }} disabled={!!exporting}>
                   <FileDown className="mr-2 h-4 w-4 text-primary" />
                   Export as PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportAsImages} disabled={!!exporting}>
+                <DropdownMenuItem onClick={() => { setSelectedExportPages(new Set(pages.map((_, i) => i))); setShowImageExport(true); }} disabled={!!exporting}>
                   <ImageIcon className="mr-2 h-4 w-4 text-emerald-500" />
                   Export as Image
                 </DropdownMenuItem>
@@ -630,7 +667,7 @@ const EditorPage = () => {
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT PANEL: PAGE SEGMENTS */}
            <div className={cn(
-             "border-r border-border/40 bg-[#fafafa] flex flex-col h-full overflow-hidden z-20 shrink-0 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-all duration-300",
+             "border-r border-border/40 bg-muted/50 flex flex-col h-full overflow-hidden z-20 shrink-0 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-all duration-300",
               isMobile ? "fixed inset-y-0 left-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[280px] xl:w-[360px]",
              isMobile && !showLeftPanel && "-translate-x-full opacity-0 pointer-events-none",
              isMobile && showLeftPanel && "translate-x-0 opacity-100"
@@ -640,12 +677,12 @@ const EditorPage = () => {
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setShowLeftPanel(false)}
-                  className="absolute top-4 right-4 h-8 w-8 rounded-full bg-white border border-border/40 z-50"
+                   className="absolute top-4 right-4 h-8 w-8 rounded-full bg-background border border-border/40 z-50"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               )}
-                <div className="flex flex-col shrink-0 border-b border-border/40 bg-white">
+                <div className="flex flex-col shrink-0 border-b border-border/40 bg-background">
                   <div className="px-4 py-3">
                      <div className="flex items-center justify-between gap-2">
                         <div className="flex gap-1.5">
@@ -747,7 +784,7 @@ const EditorPage = () => {
                         value={bulkText}
                         onChange={(e) => setBulkText(e.target.value)}
                         placeholder="Paste text here to process across pages..."
-                        className="min-h-[120px] text-sm leading-relaxed bg-white border border-border/20 focus-visible:ring-1 focus-visible:ring-primary/10 rounded-lg p-3 shadow-none"
+                        className="min-h-[120px] text-sm leading-relaxed bg-background border border-border/20 focus-visible:ring-1 focus-visible:ring-primary/10 rounded-lg p-3 shadow-none"
                       />
                       <div className="flex gap-2 mt-3">
                         <Button onClick={() => { setText(bulkText); setShowBulk(false); }} className="flex-1 h-10 text-xs uppercase font-bold tracking-widest rounded-lg">
@@ -764,13 +801,13 @@ const EditorPage = () => {
                 {!isAllBlank && (
                 /* Content Editor */
                 <section className="space-y-3">                   
-                   <div className="bg-white border border-border/40 rounded-xl p-3 hover:shadow-sm transition-all">
+                   <div className="bg-background border border-border/40 rounded-xl p-3 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-lg mb-4 border border-border/10">
                         <Button
                           variant="ghost" size="icon"
                           onClick={() => setCurrentPage(Math.max(0, currentPageIndex - 1))}
                           disabled={currentPageIndex === 0}
-                          className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-sm"
+                          className="h-9 w-9 rounded-xl hover:bg-muted/50 hover:shadow-sm"
                         >
                           <ChevronRight className="h-4 w-4 rotate-180 opacity-40" />
                         </Button>
@@ -794,7 +831,7 @@ const EditorPage = () => {
                           variant="ghost" size="icon"
                           onClick={() => setCurrentPage(Math.min(pages.length - 1, currentPageIndex + 1))}
                           disabled={currentPageIndex === pages.length - 1}
-                          className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-sm"
+                          className="h-9 w-9 rounded-xl hover:bg-muted/50 hover:shadow-sm"
                         >
                           <ChevronRight className="h-4 w-4 opacity-40" />
                         </Button>
@@ -823,7 +860,7 @@ const EditorPage = () => {
 
                 {/* Content Textarea - sticky at bottom */}
                 {pages[currentPageIndex] && (
-                  <div className="bg-white border border-border/40 rounded-xl p-4 shrink-0 border-t-0 rounded-t-none flex flex-col flex-1 min-h-0">
+                  <div className="bg-background border border-border/40 rounded-xl p-4 shrink-0 border-t-0 rounded-t-none flex flex-col flex-1 min-h-0">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
                         <FileText className="h-4 w-4" /> Content
@@ -844,10 +881,19 @@ const EditorPage = () => {
                     </div>
 
                     {/* Ink Color */}
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <span className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5 shrink-0">
                         <Palette className="h-3.5 w-3.5" /> Ink
                       </span>
+                      <label className="flex items-center gap-1 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={applyStyleToAll}
+                          onChange={(e) => setApplyStyleToAll(e.target.checked)}
+                          className="w-3 h-3 rounded"
+                        />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/50 group-hover:text-primary transition-colors">All</span>
+                      </label>
                       <div className="flex gap-2 flex-wrap items-center">
                         {INK_COLORS.map((color) => (
                           <button
@@ -867,8 +913,23 @@ const EditorPage = () => {
                         <div className="relative group flex items-center gap-1">
                           <input
                             type="color"
-                            value={INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276'}
-                            onChange={(e) => setGlobalColor(e.target.value, applyStyleToAll)}
+                            value={globalColorId?.startsWith('#') ? globalColorId : INK_COLORS.find(c => c.id === globalColorId)?.value || '#1a5276'}
+                            onInput={(e) => {
+                              customColorRef.current = (e.target as HTMLInputElement).value;
+                              if (!customColorRafRef.current) {
+                                customColorRafRef.current = requestAnimationFrame(() => {
+                                  setGlobalColorLive(customColorRef.current!, applyStyleToAll);
+                                  customColorRafRef.current = 0;
+                                });
+                              }
+                            }}
+                            onChange={(e) => {
+                              if (customColorRafRef.current) {
+                                cancelAnimationFrame(customColorRafRef.current);
+                                customColorRafRef.current = 0;
+                              }
+                              setGlobalColor(e.target.value, applyStyleToAll);
+                            }}
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                           />
                           <div className={cn(
@@ -882,6 +943,7 @@ const EditorPage = () => {
                               style={{ backgroundColor: !INK_COLORS.some(c => c.id === globalColorId) ? globalColorId : '#e2e8f0' }}
                             />
                           </div>
+                          <span className="text-[7px] font-bold text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors uppercase tracking-wider">Custom</span>
                         </div>
                       </div>
                     </div>
@@ -909,7 +971,7 @@ const EditorPage = () => {
                       {pages[currentPageIndex]?.sections[0]?.type === 'handwritten' && (
                         <Popover open={fontSearchOpen} onOpenChange={setFontSearchOpen}>
                           <PopoverTrigger asChild>
-                            <button className="flex items-center gap-2 px-3 h-8 rounded-lg text-xs font-semibold border border-border bg-white hover:bg-muted/50 transition-all w-40 justify-between">
+                             <button className="flex items-center gap-2 px-3 h-8 rounded-lg text-xs font-semibold border border-border bg-background hover:bg-muted/50 transition-all w-40 justify-between">
                               <span className={cn(HANDWRITING_STYLES.find(s => s.id === pages[currentPageIndex]?.sections[0]?.styleId)?.fontClass, "text-sm truncate")}>
                                 {HANDWRITING_STYLES.find(s => s.id === pages[currentPageIndex]?.sections[0]?.styleId)?.name || 'Select style'}
                               </span>
@@ -1057,7 +1119,7 @@ const EditorPage = () => {
 
             {/* CENTER: PREVIEW PORT */}
            <div className={cn(
-             "flex-1 bg-[#fcfcfd] flex flex-row overflow-hidden relative shadow-inner overflow-x-hidden",
+             "flex-1 bg-muted/30 flex flex-row overflow-hidden relative shadow-inner overflow-x-hidden",
              "transition-all duration-300 ease-out"
            )}>
               {/* Overlay for mobile when side panels are open */}
@@ -1074,9 +1136,9 @@ const EditorPage = () => {
               </AnimatePresence>
 
  {/* MAIN SCROLL AREA: CLEAN & FOCUSED */}
-             <div className="flex-1 flex flex-col min-w-0 bg-[#f4f4f7]">
+              <div className="flex-1 flex flex-col min-w-0 bg-muted/30">
                 {/* Page Strip - inside content frame */}
-                <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border/40 bg-white z-30">
+                <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border/40 bg-background z-30">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1 pr-2">
                     {pages.map((_, i) => (
                       <button
@@ -1085,7 +1147,7 @@ const EditorPage = () => {
                         className={cn(
                           "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-300 shrink-0 border text-xs font-semibold",
                           i === currentPageIndex
-                            ? "bg-white border-primary shadow-md ring-1 ring-primary/10 text-primary"
+                            ? "bg-background border-primary shadow-md ring-1 ring-primary/10 text-primary"
                             : "bg-muted/10 border-transparent hover:bg-muted/30 text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -1136,7 +1198,7 @@ const EditorPage = () => {
                                <div 
                                  ref={(el) => { if (el) pageRefs.current[i] = el; }}
                                  className={cn(
-                                  "bg-white ring-1 ring-border/10 absolute top-0 left-0",
+                                   "bg-background ring-1 ring-border/10 absolute top-0 left-0",
                                   isCurrent 
                                   ? "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1),0_0_1px_rgba(0,0,0,0.1)] z-20" 
                                   : "shadow-sm"
@@ -1152,14 +1214,15 @@ const EditorPage = () => {
                                 }}
                                >
                                  <PagePreview
-                                    page={page}
-                                    showMargin={page.showMargin}
-                                    showPageNumber={page.showPageNumber}
-                                    inkSmudge={page.inkSmudge}
-                                    customPaperUrl={customPaperUrl}
-                                    customPaperOpacity={customPaperOpacity}
-                                    scale={zoomScale}
-                                    showGuidelines={isEditingMargins}
+                                     page={page}
+                                     showMargin={page.showMargin}
+                                     showPageNumber={page.showPageNumber}
+                                     inkSmudge={page.inkSmudge}
+                                     customPaperUrl={customPaperUrl}
+                                     customPaperOpacity={customPaperOpacity}
+                                     scale={zoomScale}
+                                     showGuidelines={isEditingMargins}
+                                     previewColor={globalColorId}
                                    ref={setPageRef(i)}
                                    onImageUpdate={(sectionId, imgIdx, updates) => {
                                      const sectionIdx = page.sections.findIndex(s => s.id === sectionId);
@@ -1196,7 +1259,7 @@ const EditorPage = () => {
 
            {/* RIGHT PANEL: EDITOR SETTINGS */}
            <div className={cn(
-             "border-l border-border/40 bg-[#fafafa] flex flex-col h-full overflow-hidden z-20 shrink-0 transition-all duration-300",
+              "border-l border-border/40 bg-muted/50 flex flex-col h-full overflow-hidden z-20 shrink-0 transition-all duration-300",
               isMobile ? "fixed inset-y-0 right-0 w-[90vw] max-w-[400px] z-[100] h-full" : "w-[280px] xl:w-[360px]",
              isMobile && !showRightPanel && "translate-x-full opacity-0 pointer-events-none",
              isMobile && showRightPanel && "translate-x-0 opacity-100"
@@ -1206,7 +1269,7 @@ const EditorPage = () => {
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setShowRightPanel(false)}
-                  className="absolute top-4 left-4 h-8 w-8 rounded-full bg-white border border-border/40 z-50"
+                   className="absolute top-4 left-4 h-8 w-8 rounded-full bg-background border border-border/40 z-50"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -1223,7 +1286,7 @@ const EditorPage = () => {
                      </TabsTrigger>
                    </TabsList>
                  </div>
-                  <div className="flex-1 overflow-hidden bg-[#fafafa]">
+                   <div className="flex-1 overflow-hidden bg-muted/30">
                     <TabsContent value="handwriting" className="mt-0 h-full">
                       <HandwritingStyleTab
                        globalStyleId={globalStyleId}
@@ -1257,7 +1320,7 @@ const EditorPage = () => {
 
                 {/* PAPER ARCHITECTURE — sticky at bottom, outside tabs */}
                <div
-                 className="shrink-0 border-t border-border/40 bg-white px-6 py-4"
+                 className="shrink-0 border-t border-border/40 bg-background px-6 py-4"
                  onMouseEnter={() => setIsEditingMargins(true)}
                  onMouseLeave={() => setIsEditingMargins(false)}
                >
@@ -1366,7 +1429,7 @@ const EditorPage = () => {
              {/* Hidden Capture Area */}
           <div className="fixed -left-[8000px] top-0 pointer-events-none opacity-0">
               {pages.map((page, i) => (
-                <div key={`export-wrapper-${page.id}`} className="bg-white">
+                <div key={`export-wrapper-${page.id}`} className="bg-background">
                   <PagePreview
                     page={page}
                     showMargin={showMargin}
@@ -1381,6 +1444,176 @@ const EditorPage = () => {
           </div>
         </div>
       </div>
+
+      {/* IMAGE EXPORT DIALOG */}
+      <Dialog open={showImageExport} onOpenChange={setShowImageExport}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-emerald-500" />
+              Export as Image
+            </DialogTitle>
+            <DialogDescription>
+              Select pages to export. Single page downloads directly, multiple pages download as ZIP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-[300px] overflow-y-auto scrollbar-premium pr-1">
+            <button
+              onClick={() => {
+                if (selectedExportPages.size === pages.length) {
+                  setSelectedExportPages(new Set());
+                } else {
+                  setSelectedExportPages(new Set(pages.map((_, i) => i)));
+                }
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                selectedExportPages.size === pages.length
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border hover:border-primary/40 text-foreground"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 rounded-sm border flex items-center justify-center transition-all",
+                selectedExportPages.size === pages.length ? "bg-primary border-primary" : "border-muted-foreground/40"
+              )}>
+                {selectedExportPages.size === pages.length && <Check className="h-3 w-3 text-white" />}
+              </div>
+              Select All ({pages.length} pages)
+            </button>
+            {pages.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  const next = new Set(selectedExportPages);
+                  if (next.has(i)) next.delete(i); else next.add(i);
+                  setSelectedExportPages(next);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border text-sm transition-all",
+                  selectedExportPages.has(i)
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/40"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded-sm border flex items-center justify-center transition-all",
+                  selectedExportPages.has(i) ? "bg-primary border-primary" : "border-muted-foreground/40"
+                )}>
+                  {selectedExportPages.has(i) && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <span className="font-medium text-foreground">Page {i + 1}</span>
+                {selectedExportPages.has(i) && selectedExportPages.size === 1 && (
+                  <span className="ml-auto text-[10px] font-bold text-emerald-500 uppercase">Direct download</span>
+                )}
+                {selectedExportPages.has(i) && selectedExportPages.size > 1 && (
+                  <span className="ml-auto text-[10px] font-bold text-blue-500 uppercase">ZIP download</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/40">
+            <span className="text-xs text-muted-foreground">
+              {selectedExportPages.size} of {pages.length} selected
+              {selectedExportPages.size === 1 && ' → PNG'}
+              {selectedExportPages.size > 1 && ' → ZIP'}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowImageExport(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={selectedExportPages.size === 0 || !!exporting}
+                onClick={() => exportAsImages(Array.from(selectedExportPages))}
+                className="gap-1.5"
+              >
+                {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                Export
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF EXPORT DIALOG */}
+      <Dialog open={showPdfExport} onOpenChange={setShowPdfExport}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-primary" />
+              Export as PDF
+            </DialogTitle>
+            <DialogDescription>
+              Select pages to include in the PDF document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-[300px] overflow-y-auto scrollbar-premium pr-1">
+            <button
+              onClick={() => {
+                if (selectedExportPages.size === pages.length) {
+                  setSelectedExportPages(new Set());
+                } else {
+                  setSelectedExportPages(new Set(pages.map((_, i) => i)));
+                }
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all",
+                selectedExportPages.size === pages.length
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border hover:border-primary/40 text-foreground"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 rounded-sm border flex items-center justify-center transition-all",
+                selectedExportPages.size === pages.length ? "bg-primary border-primary" : "border-muted-foreground/40"
+              )}>
+                {selectedExportPages.size === pages.length && <Check className="h-3 w-3 text-white" />}
+              </div>
+              Select All ({pages.length} pages)
+            </button>
+            {pages.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  const next = new Set(selectedExportPages);
+                  if (next.has(i)) next.delete(i); else next.add(i);
+                  setSelectedExportPages(next);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border text-sm transition-all",
+                  selectedExportPages.has(i)
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/40"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded-sm border flex items-center justify-center transition-all",
+                  selectedExportPages.has(i) ? "bg-primary border-primary" : "border-muted-foreground/40"
+                )}>
+                  {selectedExportPages.has(i) && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <span className="font-medium text-foreground">Page {i + 1}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/40">
+            <span className="text-xs text-muted-foreground">
+              {selectedExportPages.size} of {pages.length} selected → PDF
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowPdfExport(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={selectedExportPages.size === 0 || !!exporting}
+                onClick={() => exportAsPDF(Array.from(selectedExportPages))}
+                className="gap-1.5"
+              >
+                {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                Export
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );

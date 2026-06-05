@@ -13,10 +13,11 @@ interface PagePreviewProps {
   scale?: number;
   showGuidelines?: boolean;
   onImageUpdate?: (sectionId: string, imageIndex: number, updates: { x: number, y: number }) => void;
+  previewColor?: string;
 }
 
 export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
-  ({ page, showMargin, showPageNumber, inkSmudge, customPaperUrl, customPaperOpacity = 100, scale = 1, showGuidelines = false, onImageUpdate }, ref) => {
+  ({ page, showMargin, showPageNumber, inkSmudge, customPaperUrl, customPaperOpacity = 100, scale = 1, showGuidelines = false, onImageUpdate, previewColor }, ref) => {
     const layout = PAGE_LAYOUTS.find(l => l.id === page.layoutId) || PAGE_LAYOUTS[0];
     const size = PAGE_SIZES.find(s => s.id === page.sizeId) || PAGE_SIZES[0];
 
@@ -25,7 +26,8 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
     const heightPx = size.height * 2.5;
 
     const isCustom = page.layoutId === 'custom';
-    const bgImage = isCustom && customPaperUrl ? customPaperUrl : undefined;
+    const hasPaperImage = !!layout.paperImage;
+    const bgImage = isCustom && customPaperUrl ? customPaperUrl : layout.paperImage;
 
     return (
       <div
@@ -47,19 +49,20 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
           contain: 'layout style',
         }}
       >
-        {isCustom && bgImage && (
+        {bgImage && (
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               backgroundImage: `url(${bgImage})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              opacity: customPaperOpacity / 100,
+              opacity: (isCustom ? customPaperOpacity : 100) / 100,
             }}
           />
         )}
         {page.sections.map((section) => {
           const color = INK_COLORS.find(c => c.id === section.colorId);
+          const colorValue = section.colorId?.startsWith('#') ? section.colorId : section.customColor || color?.value || '#1c2526';
 
           return (
             <div key={section.id}>
@@ -132,7 +135,7 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
                 <div
                   className="font-body"
                   style={{
-                    color: color?.value || '#1c2526',
+                    color: colorValue,
                     fontSize: section.isHeading ? `${(section.headingLevel === 1 ? 22 : section.headingLevel === 2 ? 18 : 16) * scale}px` : undefined,
                     fontWeight: section.isHeading ? 700 : 400,
                     whiteSpace: 'pre-wrap',
@@ -146,6 +149,7 @@ export const PagePreview = memo(forwardRef<HTMLDivElement, PagePreviewProps>(
                   section={section}
                   scale={scale}
                   inkSmudge={inkSmudge}
+                  previewColor={previewColor}
                 />
               )}
             </div>

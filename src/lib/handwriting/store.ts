@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PageConfig, TextSection } from './types';
+import { PageConfig, TextSection, HANDWRITING_STYLES } from './types';
 
 interface Snapshot {
   pages: PageConfig[];
@@ -50,6 +50,7 @@ interface AppState {
   setCurrentPage: (index: number) => void;
   setGlobalStyle: (id: string, applyToAll?: boolean) => void;
   setGlobalColor: (id: string, applyToAll?: boolean) => void;
+  setGlobalColorLive: (id: string, applyToAll?: boolean) => void;
   setGlobalSize: (id: string, applyToAll?: boolean) => void;
   setGlobalLayout: (id: string, applyToAll?: boolean) => void;
   setShowMargin: (v: boolean, applyToAll?: boolean) => void;
@@ -98,18 +99,17 @@ const getLineLimit = (sizeId: string, margins: { top: number, bottom: number }):
   return Math.max(1, Math.floor((effectiveHeight - buffer) / lineHeightMm));
 };
 
-const getCharsPerLine = (sizeId: string, margins: { left: number, right: number }): number => {
+const getCharsPerLine = (sizeId: string, margins: { left: number, right: number }, styleId?: string): number => {
   const { w } = getPageDimensions(sizeId);
   const effectiveWidth = w - margins.left - margins.right;
-  // charWidthMm tuned to match Caveat/handwriting font at 18px (~7.5px/char = 3.0mm)
-  // Slightly conservative (3.2mm) to account for variable character widths and prevent CSS overflow-wrap
-  let charWidthMm = 3.2;
-  let widthBuffer = 4;
-  if (sizeId === 'a5') {
-    charWidthMm = 3.1;
-    widthBuffer = 2;
-  }
-  return Math.max(10, Math.floor((effectiveWidth - widthBuffer) / charWidthMm));
+  // Base charWidthMm tuned for Caveat at 18px (~3.2mm per char)
+  const baseCharWidthMm = sizeId === 'a5' ? 3.1 : 3.2;
+  const baseBuffer = sizeId === 'a5' ? 2 : 4;
+  const factor = styleId ? Math.max(0.75, HANDWRITING_STYLES.find(s => s.id === styleId)?.charWidthFactor ?? 1.0) : 1.0;
+  const charWidthMm = baseCharWidthMm * factor;
+  // Wider fonts need extra buffer for spacing/kerning variations
+  const extraBuffer = factor > 1.1 ? 3 : factor > 1.0 ? 1 : 0;
+  return Math.max(10, Math.floor((effectiveWidth - baseBuffer - extraBuffer) / charWidthMm));
 };
 
 const wrapTextByWords = (text: string, charsPerLine: number): string[] => {
@@ -166,8 +166,8 @@ const createDefaultPage = (
   sizeId,
   layoutId,
   margins,
-  showMargin: true,
-  showPageNumber: true,
+  showMargin: false,
+  showPageNumber: false,
   pageNumber,
   locked: false,
 });
@@ -203,9 +203,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   globalStyleId: 'caveat',
   globalColorId: 'blue',
   globalSizeId: 'a4',
-  globalLayoutId: 'ruled',
-  showMargin: true,
-  showPageNumbers: true,
+  globalLayoutId: 'paper-3',
+  showMargin: false,
+  showPageNumbers: false,
   inkSmudge: false,
   customPaperUrl: '',
   customPaperOpacity: 100,
@@ -282,6 +282,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
+  setGlobalColorLive: (id, applyToAll = true) => {
+    set((state) => ({
+      globalColorId: applyToAll ? id : state.globalColorId,
+    }));
+  },
+
   setGlobalSize: (id, applyToAll = true) => {
     get().saveHistory();
     set((state) => {
@@ -300,7 +306,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       while (currentPage < pages.length) {
         const page = pages[currentPage];
         const limit = getLineLimit(page.sizeId, page.margins || state.globalMargins);
-        const charsPerLine = getCharsPerLine(page.sizeId, page.margins || state.globalMargins);
+        const charsPerLine = getCharsPerLine(page.sizeId, page.margins || state.globalMargins, state.globalStyleId);
         
         let linesUsed = 0;
         let sIdx = 0;
@@ -478,7 +484,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const section = pages[currentPage].sections[currentSection];
         if (section.isHeading || !section.content.length) break;
         const limit = getLineLimit(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
-        const charsPerLine = getCharsPerLine(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins);
+        const charsPerLine = getCharsPerLine(pages[currentPage].sizeId, pages[currentPage].margins || state.globalMargins, state.globalStyleId);
 
         const wrappedLines = wrapTextByWords(section.content, charsPerLine);
         let linesBefore = 0;
@@ -517,7 +523,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         for (let pullPage = pageIndex; pullPage < pages.length - 1; pullPage++) {
           const pg = pages[pullPage];
           const pg_limit = getLineLimit(pg.sizeId, pg.margins || state.globalMargins);
-          const pg_chars = getCharsPerLine(pg.sizeId, pg.margins || state.globalMargins);
+          const pg_chars = getCharsPerLine(pg.sizeId, pg.margins || state.globalMargins, state.globalStyleId);
 
           // Count total lines currently on this page
           let usedLines = 0;
@@ -601,7 +607,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().saveHistory();
     set((state) => {
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
-      const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
+      const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins, state.globalStyleId);
       const wrappedLines = wrapTextByWords(text, charsPerLine);
       const pages: PageConfig[] = [];
       let currentPageLines: string[] = [];
@@ -629,7 +635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const allText = state.pages.flatMap(p => p.sections.map(s => s.content)).join('\n');
       const limit = getLineLimit(state.globalSizeId, state.globalMargins);
-      const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins);
+      const charsPerLine = getCharsPerLine(state.globalSizeId, state.globalMargins, state.globalStyleId);
       const wrappedLines = wrapTextByWords(allText, charsPerLine);
       const newPages: PageConfig[] = [];
       let currentPageLines: string[] = [];
@@ -690,7 +696,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const sizeId = note.sizeId;
     const margins = state.globalMargins;
     const limit = getLineLimit(sizeId, margins);
-    const charsPerLine = getCharsPerLine(sizeId, margins);
+    const charsPerLine = getCharsPerLine(sizeId, margins, state.globalStyleId);
 
     // Collect all text from all sections across all pages
     const allText = note.pages

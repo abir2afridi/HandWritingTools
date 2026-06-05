@@ -6,6 +6,7 @@ interface HandwritingRendererProps {
   section: TextSection;
   scale: number;
   inkSmudge: boolean;
+  previewColor?: string;
 }
 
 function hash(a: number, b: number, c: number) {
@@ -25,10 +26,10 @@ function splitGraphemes(text: string): string[] {
   return Array.from(text);
 }
 
-export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge }: HandwritingRendererProps) => {
+export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge, previewColor }: HandwritingRendererProps) => {
   const style = HANDWRITING_STYLES.find(s => s.id === section.styleId);
   const color = INK_COLORS.find(c => c.id === section.colorId);
-  const colorValue = section.customColor || color?.value || '#1a5276';
+  const colorValue = previewColor?.startsWith('#') ? previewColor : section.colorId?.startsWith('#') ? section.colorId : section.customColor || color?.value || '#1a5276';
   const seed = useMemo(() => section.id.charCodeAt(0) + (section.id.length > 0 ? section.id.charCodeAt(section.id.length - 1) : 0), [section.id]);
 
   const lines = (section.content || '').split('\n');
@@ -76,6 +77,8 @@ export const HandwritingRenderer = React.memo(({ section, scale, inkSmudge }: Ha
               flexWrap: 'wrap',
               alignItems: 'baseline',
               transform: `translateY(${lineDrift}px)`,
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
             }}
           >
             {line.length === 0 ? (

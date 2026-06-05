@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Home, PenTool as WriterIcon, ChevronLeft, PanelLeft } from 'lucide-react';
+import { Sparkles, Home, PenTool as WriterIcon, ChevronLeft, PanelLeft, Info } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -141,6 +141,39 @@ export default function AppSidebar({ className }: { className?: string }) {
         </div>
 
         <div className="flex-1" />
+
+        {/* Platform */}
+        <nav className="p-3 space-y-1">
+          {isExpanded && (
+            <motion.p 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="px-3 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap mb-1"
+            >
+              Platform
+            </motion.p>
+          )}
+          <button
+            onClick={() => navigate('/about')}
+            className={cn(
+              "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 overflow-hidden",
+              location.pathname === '/about'
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Info className="w-4.5 h-4.5 shrink-0" />
+            <motion.span 
+              animate={{ opacity: isExpanded ? 1 : 0 }} 
+              className="whitespace-nowrap"
+            >
+              About
+            </motion.span>
+          </button>
+        </nav>
+
+        <div className="px-5 py-2">
+          <div className="h-px bg-border/60" />
+        </div>
 
         {/* Upgrade CTA */}
         <AnimatePresence>
