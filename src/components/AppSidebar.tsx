@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Sparkles, Home, PenTool as WriterIcon, ChevronLeft, PanelLeft, Info } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -57,31 +57,6 @@ export default function AppSidebar({ className, hideMobileButton }: { className?
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
-        {/* Model Engine Status */}
-        <AnimatePresence>
-          {(isExpanded || isMobile) && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="px-4 mt-4 overflow-hidden"
-            >
-              <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-primary">Content Engine</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                </div>
-                <p className="text-[11px] font-bold text-slate-700 leading-none">Gemini 2.0 Flash</p>
-                <div className="h-px bg-primary/10 my-2" />
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Visuals</span>
-                </div>
-                <p className="text-[11px] font-bold leading-none text-slate-500">Manual Uploads</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Main Nav */}
         <nav className="p-3 space-y-1 mt-2">
           {(isExpanded || isMobile) && (
@@ -204,25 +179,7 @@ export default function AppSidebar({ className, hideMobileButton }: { className?
           <div className="h-px bg-border/60" />
         </div>
 
-        {/* Upgrade CTA */}
-        <AnimatePresence>
-          {(isExpanded || isMobile) && (
-            <motion.div
-               initial={{ opacity: 0, height: 0 }}
-               animate={{ opacity: 1, height: 'auto' }}
-               exit={{ opacity: 0, height: 0 }}
-               className="p-4 mt-auto overflow-hidden"
-            >
-              <div className="rounded-xl bg-hero-gradient p-4 text-left">
-                <p className="text-sm font-bold text-primary-foreground whitespace-nowrap">Upgrade to Pro</p>
-                <p className="text-[10px] font-medium text-primary-foreground/80 mt-1 whitespace-nowrap">Unlimited generations</p>
-                <button className="mt-3 w-full bg-background/20 backdrop-blur text-primary-foreground text-xs font-bold py-2 rounded-lg hover:bg-background/30 transition-colors duration-150 whitespace-nowrap">
-                  Learn more
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
       </div>
 
       {/* Bottom toggle button (desktop only) */}
