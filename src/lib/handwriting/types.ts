@@ -153,6 +153,7 @@ export const PAGE_LAYOUTS: PageLayout[] = [
   { id: 'paper-1', name: 'Cotton Texture', paperClass: 'bg-paper-white', description: 'Soft cotton paper texture', paperImage: '/paper/kiwihug-qv05FvdE26k-unsplash.jpg' },
   { id: 'paper-2', name: 'Marble Surface', paperClass: 'bg-paper-white', description: 'Elegant marble background', paperImage: '/paper/marjan-blan-_kUxT8WkoeY-unsplash.jpg' },
   { id: 'paper-4', name: 'Folded Paper', paperClass: 'bg-paper-white', description: 'Naturally folded paper', paperImage: '/paper/marjan-blan-794QUz5-cso-unsplash.jpg' },
+  { id: 'vhija', name: 'Vhija Paper', paperClass: 'bg-paper-white', description: 'Hand-drawn textured paper', paperImage: '/paper/vhija.png' },
   { id: 'plain', name: 'Plain White', paperClass: 'bg-paper-white', description: 'Clean white paper' },
   { id: 'realistic-white', name: 'Realistic White', paperClass: 'paper-realistic-white', description: 'Premium tactile cotton paper' },
   { id: 'ruled', name: 'Ruled Lines', paperClass: 'paper-ruled bg-paper-white', description: 'Horizontal lines like a notebook' },
